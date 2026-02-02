@@ -1,4 +1,4 @@
-#Physical Demonstration of Network Latency
+Physical Demonstration of Network Latency
 
 This project implements a physical, interactive demonstrator that makes network latency visible by introducing artificial delays into a control system or game.
 
