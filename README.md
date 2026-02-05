@@ -1,5 +1,12 @@
-Physical Demonstration of Network Latency for Nokia Executive Experience Center
+# Physical Network Latency Demo – Ball Maze Game
 
-This project implements a physical, interactive demonstrator for the  that makes network latency visible by introducing artificial delays into a control system or game.
 
-The system is designed for educational and executive demonstrations, where users can directly experience how latency degrades real-time interaction.
+A physical ball maze game where two knobs control the board tilt (X/Y),
+and a third knob adjusts *network latency* in real time. Built as a hands-on
+demo for explaining why low latency matters (IoT / networking / control systems).
+
+## Concept
+- Knob X/Y -> control commands
+- Knob Latency -> changes artificial delay
+- Commands go through a network latency proxy (delay/jitter/drop can be added)
+- Device actuates servos / motors based on delayed commands
