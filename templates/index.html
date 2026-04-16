@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Nokia Latency Demo</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #0a0a0f;
+            color: #00d4ff;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        h1 {
+            font-size: 2em;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+            color: #00d4ff;
+            margin-bottom: 5px;
+        }
+
+        .subtitle {
+            font-size: 0.8em;
+            letter-spacing: 6px;
+            color: #005f7a;
+            margin-bottom: 40px;
+            text-transform: uppercase;
+        }
+
+        .card {
+            background: #0d1117;
+            border: 1px solid #00d4ff22;
+            border-radius: 12px;
+            padding: 30px;
+            width: 100%;
+            max-width: 500px;
+            margin-bottom: 20px;
+            box-shadow: 0 0 30px #00d4ff11;
+        }
+
+        .card h2 {
+            font-size: 0.75em;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+            color: #005f7a;
+            margin-bottom: 20px;
+        }
+
+        .slider-row {
+            margin-bottom: 20px;
+        }
+
+        .slider-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 0.9em;
+            letter-spacing: 2px;
+        }
+
+        .slider-value {
+            color: #00d4ff;
+            font-weight: bold;
+        }
+
+        input[type=range] {
+            width: 100%;
+            appearance: none;
+            height: 4px;
+            background: #00d4ff33;
+            border-radius: 2px;
+            outline: none;
+        }
+
+        input[type=range]::-webkit-slider-thumb {
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #00d4ff;
+            cursor: pointer;
+            box-shadow: 0 0 10px #00d4ff;
+        }
+
+        .status-box {
+            background: #0d1117;
+            border: 1px solid #00d4ff22;
+            border-radius: 12px;
+            padding: 20px;
+            width: 100%;
+            max-width: 500px;
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 20px;
+        }
+
+        .status-item {
+            text-align: center;
+        }
+
+        .status-item .val {
+            font-size: 1.8em;
+            font-weight: bold;
+            color: #00d4ff;
+        }
+
+        .status-item .label {
+            font-size: 0.65em;
+            letter-spacing: 3px;
+            color: #005f7a;
+            text-transform: uppercase;
+        }
+
+        .mode-badge {
+            font-size: 0.7em;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            color: #005f7a;
+            margin-bottom: 30px;
+        }
+
+        .mode-badge span {
+            color: #00d4ff;
+        }
+
+        #gyro-status {
+            font-size: 0.75em;
+            color: #005f7a;
+            letter-spacing: 2px;
+            margin-top: 10px;
+        }
+
+        .graph-card {
+            background: #0d1117;
+            border: 1px solid #00d4ff22;
+            border-radius: 12px;
+            padding: 30px;
+            width: 100%;
+            max-width: 500px;
+            margin-bottom: 20px;
+            box-shadow: 0 0 30px #00d4ff11;
+        }
+
+        .graph-card h2 {
+            font-size: 0.75em;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+            color: #005f7a;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Nokia</h1>
+
+    <div class="mode-badge">Control mode: <span id="modeLabel">detecting...</span></div>
+
+    <div class="status-box">
+        <div class="status-item">
+            <div class="val" id="dispX">50</div>
+            <div class="label">X Tilt</div>
+        </div>
+        <div class="status-item">
+            <div class="val" id="dispY">50</div>
+            <div class="label">Y Tilt</div>
+        </div>
+        <div class="status-item">
+            <div class="val" id="dispLat">0</div>
+            <div class="label">Latency ms</div>
+        </div>
+        <div class="status-item">
+            <div class="val" id="dispJitter">0</div>
+            <div class="label">Jitter ms</div>
+        </div>
+    </div>
+	
+    <div class="card">
+        <h2>Network Settings</h2>
+        <div class="slider-row">
+            <div class="slider-label">
+                <span>Latency</span>
+                <span class="slider-value"><span id="latVal">0</span> ms</span>
+            </div>
+            <input type="range" min="0" max="1000" value="0" id="latency">
+        </div>
+        <div class="slider-row">
+            <div class="slider-label">
+                <span>Jitter</span>
+                <span class="slider-value">±<span id="jitterVal">0</span> ms</span>
+            </div>
+            <input type="range" min="0" max="500" value="0" id="jitter">
+        </div>
+    </div>
+
+    <div class="graph-card">
+        <h2>Live Network Delay Graph</h2>
+        <canvas id="latencyChart"></canvas>
+    </div>
+
+<div class="card">
+    <h2>Live Camera Feed</h2>
+    <img src="/video_feed" style="width:100%; border-radius:8px;">
+</div>
+
+	
+<div class="card">
+        <h2>AI Mode</h2>
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span style="letter-spacing: 2px; font-size: 0.9em;">Let AI play the maze</span>
+            <button id="aiBtn" onclick="toggleAI()" style="
+                background: #00d4ff22;
+                border: 1px solid #00d4ff;
+                color: #00d4ff;
+                padding: 10px 25px;
+                border-radius: 8px;
+                cursor: pointer;
+                letter-spacing: 2px;
+                font-size: 0.85em;
+                text-transform: uppercase;
+            ">Enable AI</button>
+        </div>
+        <div id="aiStatus" style="
+            margin-top: 15px;
+            font-size: 0.75em;
+            letter-spacing: 2px;
+            color: #005f7a;
+            text-transform: uppercase;
+        ">AI is off</div>
+    </div>
+
+
+
+    <div id="gyro-status"></div>
+
+<script>
+    let isMobile = /iPhone|iPad|Android/i.test(navigator.userAgent);
+    let x = 50, y = 50;
+    let currentLatency = 0;
+    let currentJitter = 0;
+
+    document.getElementById("modeLabel").innerText = isMobile ? "Phone Gyroscope" : "Keyboard Arrows";
+
+    // Chart setup
+    const ctx = document.getElementById("latencyChart").getContext("2d");
+    const maxPoints = 30;
+    const labels = Array(maxPoints).fill("");
+    const latencyData = Array(maxPoints).fill(0);
+    const actualDelayData = Array(maxPoints).fill(0);
+
+    const chart = new Chart(ctx, {
+        type: "line",
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: "Latency (ms)",
+                    data: latencyData,
+                    borderColor: "#00d4ff",
+                    backgroundColor: "#00d4ff11",
+                    borderWidth: 2,
+                    pointRadius: 0,
+                    tension: 0.4,
+                    fill: true
+                },
+                {
+                    label: "Actual Delay with Jitter (ms)",
+                    data: actualDelayData,
+                    borderColor: "#ff6b6b",
+                    backgroundColor: "#ff6b6b11",
+                    borderWidth: 2,
+                    pointRadius: 0,
+                    tension: 0.4,
+                    fill: true
+                }
+            ]
+        },
+        options: {
+            animation: false,
+            scales: {
+                x: {
+                    display: false
+                },
+                y: {
+                    min: 0,
+                    ticks: { color: "#005f7a" },
+                    grid: { color: "#00d4ff11" }
+                }
+            },
+            plugins: {
+                legend: {
+                    labels: { color: "#00d4ff", font: { size: 10 } }
+                }
+            }
+        }
+    });
+
+    function updateGraph() {
+        const jitter = currentJitter;
+        const randomJitter = Math.floor(Math.random() * (jitter * 2 + 1)) - jitter;
+        const actualDelay = Math.max(0, currentLatency + randomJitter);
+
+        latencyData.push(currentLatency);
+        latencyData.shift();
+        actualDelayData.push(actualDelay);
+        actualDelayData.shift();
+
+        chart.update();
+    }
+
+    setInterval(updateGraph, 500);
+
+    // Send tilt to server
+    function sendTilt() {
+        document.getElementById("dispX").innerText = Math.round(x);
+        document.getElementById("dispY").innerText = Math.round(y);
+        fetch("/update", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ x: Math.round(x), y: Math.round(y) })
+        });
+    }
+
+    // Send settings to server
+    function sendSettings() {
+        const latency = document.getElementById("latency").value;
+        const jitter = document.getElementById("jitter").value;
+        currentLatency = parseInt(latency);
+        currentJitter = parseInt(jitter);
+        document.getElementById("latVal").innerText = latency;
+        document.getElementById("jitterVal").innerText = jitter;
+        document.getElementById("dispLat").innerText = latency;
+        document.getElementById("dispJitter").innerText = jitter;
+        fetch("/settings", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ latency: parseInt(latency), jitter: parseInt(jitter) })
+        });
+    }
+
+    document.getElementById("latency").addEventListener("input", sendSettings);
+    document.getElementById("jitter").addEventListener("input", sendSettings);
+
+    // PHONE - Gyroscope
+    if (isMobile) {
+        if (typeof DeviceOrientationEvent !== "undefined" &&
+            typeof DeviceOrientationEvent.requestPermission === "function") {
+            document.getElementById("gyro-status").innerText = "Tap screen to enable gyroscope";
+            document.body.addEventListener("click", () => {
+                DeviceOrientationEvent.requestPermission().then(state => {
+                    if (state === "granted") {
+                        document.getElementById("gyro-status").innerText = "Gyroscope active";
+                        startGyro();
+                    }
+                });
+            }, { once: true });
+        } else {
+            startGyro();
+        }
+    }
+
+    function startGyro() {
+        window.addEventListener("deviceorientation", (e) => {
+            x = Math.min(100, Math.max(0, (e.gamma + 45) * (100 / 90)));
+            y = Math.min(100, Math.max(0, (e.beta + 45) * (100 / 90)));
+            sendTilt();
+        });
+    }
+
+    // LAPTOP - Arrow keys
+    if (!isMobile) {
+        const keys = {};
+        document.addEventListener("keydown", e => keys[e.key] = true);
+        document.addEventListener("keyup", e => keys[e.key] = false);
+
+        setInterval(() => {
+            let moved = false;
+            if (keys["ArrowLeft"])  { x = Math.max(0, x - 2); moved = true; }
+            if (keys["ArrowRight"]) { x = Math.min(100, x + 2); moved = true; }
+            if (keys["ArrowUp"])    { y = Math.max(0, y - 2); moved = true; }
+            if (keys["ArrowDown"])  { y = Math.min(100, y + 2); moved = true; }
+            if (moved) sendTilt();
+        }, 50);
+    }
+
+
+let aiActive = false;
+
+    function toggleAI() {
+        aiActive = !aiActive;
+        const btn = document.getElementById("aiBtn");
+        const status = document.getElementById("aiStatus");
+
+        fetch("/ai", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ enable: aiActive })
+        }).then(res => res.json()).then(data => {
+            if (data.status === "ok") {
+                btn.innerText = aiActive ? "Disable AI" : "Enable AI";
+                btn.style.background = aiActive ? "#00d4ff33" : "#00d4ff22";
+                status.innerText = aiActive ? "AI is playing..." : "AI is off";
+                status.style.color = aiActive ? "#00d4ff" : "#005f7a";
+            } else {
+                alert("AI not available yet — camera needed!");
+                aiActive = false;
+            }
+        });
+    }
+
+
+
+</script>
+</body>
+</html>
