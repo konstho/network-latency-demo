@@ -1,132 +1,231 @@
-from flask import Flask, render_template, request, jsonify
-import time
+"""
+Flask server for the ball-balance maze.
+
+Key fixes from the old version:
+  * picamera2 configured with format="RGB888" so frames arrive in BGR
+    (otherwise OpenCV calls produce silent garbage)
+  * AI is actually wired to the camera frames — process_frame() runs
+    in a dedicated loop and produces the annotated frame that the stream serves
+  * frame sharing is properly locked
+  * new endpoints:
+      POST /set_start_end     set path endpoints in image pixel coords
+      POST /plan_path         run path planning on the current frame
+      POST /set_gains         tune kp/kd/tilt_gain/lookahead at runtime
+      POST /clear_plan        forget planned path
+  * backward-compatible with your existing /update, /settings, /ai, /status
+  * new page at /ai_test for AI-specific testing (your / page is untouched)
+"""
+
 import random
 import threading
-from picamera2 import Picamera2
-from picamera2.encoders import MJPEGEncoder
-from picamera2.outputs import FileOutput
-import io
+import time
 
+import cv2
+from flask import Flask, render_template, request, jsonify, Response
+
+from picamera2 import Picamera2
+from ai import AIController
+
+
+# ---------------------------------------------------------------------------
+# Setup
+# ---------------------------------------------------------------------------
 
 app = Flask(__name__)
 
-# Try to import AI controller
-try:
-    from ai import AIController
-    ai_controller = AIController()
-    AI_AVAILABLE = True
-except Exception as e:
-    print(f"AI not available: {e}")
-    AI_AVAILABLE = False
+# Set esp32_port="/dev/ttyUSB0" (or wherever) once you plug the ESP32 in.
+ai_controller = AIController(esp32_port=None)
 
-current_values = {
-    "x": 50,
-    "y": 50,
-    "latency": 0,
-    "jitter": 0,
-    "ai_mode": False
-}
+state = {"latency": 0, "jitter": 0, "x": 50, "y": 50, "ai_mode": False}
+
+FRAME_W, FRAME_H = 640, 480
+
+picam = Picamera2()
+picam.configure(picam.create_video_configuration(
+    main={"size": (FRAME_W, FRAME_H), "format": "RGB888"},   # → BGR numpy
+    controls={"FrameRate": 30},
+))
+picam.start()
+time.sleep(0.5)  # let auto-exposure settle
+
+frame_lock = threading.Lock()
+raw_frame = None        # latest frame from camera (BGR)
+display_frame = None    # latest annotated frame for the stream
 
 
-camera = Picamera2()
-camera.configure(camera.create_video_configuration(main={"size": (640, 480)}))
-
-output_frame = None
-lock = threading.Lock()
-
-def capture_frames():
-    global output_frame
-    camera.start()
+def _capture_loop():
+    global raw_frame
     while True:
-        frame = camera.capture_array()
-        with lock:
-            output_frame = frame.copy()
+        f = picam.capture_array()
+        with frame_lock:
+            raw_frame = f
+        time.sleep(1 / 60)   # sleep a bit, don't pin a core
 
-threading.Thread(target=capture_frames, daemon=True).start()
 
-def generate():
-    global output_frame
+def _ai_loop():
+    """Pulls the latest raw frame, runs AI, writes the annotated frame."""
+    global display_frame
     while True:
-        with lock:
-            if output_frame is None:
-                continue
-            import cv2
-            _, buffer = cv2.imencode(".jpg", output_frame)
-            frame = buffer.tobytes()
+        with frame_lock:
+            f = None if raw_frame is None else raw_frame.copy()
+        if f is None:
+            time.sleep(0.02)
+            continue
+        annotated, _ = ai_controller.process_frame(f)
+        with frame_lock:
+            display_frame = annotated
+        # target ~30 Hz processing
+        time.sleep(1 / 30)
+
+
+threading.Thread(target=_capture_loop, daemon=True).start()
+threading.Thread(target=_ai_loop, daemon=True).start()
+
+
+def _mjpeg_stream():
+    while True:
+        with frame_lock:
+            f = None if display_frame is None else display_frame
+            buf = None
+            if f is not None:
+                ok, encoded = cv2.imencode(".jpg", f, [cv2.IMWRITE_JPEG_QUALITY, 80])
+                if ok:
+                    buf = encoded.tobytes()
+        if buf is None:
+            time.sleep(0.03)
+            continue
         yield (b"--frame\r\n"
-               b"Content-Type: image/jpeg\r\n\r\n" + frame + b"\r\n")
+               b"Content-Type: image/jpeg\r\n\r\n" + buf + b"\r\n")
+        time.sleep(1 / 30)
+
+
+# ---------------------------------------------------------------------------
+# Routes
+# ---------------------------------------------------------------------------
+
+@app.route("/")
+def index():
+    # your existing UI — leave as-is
+    return render_template("index.html")
+
+
+@app.route("/ai_test")
+def ai_test():
+    return render_template("ai_test.html")
 
 
 @app.route("/video_feed")
 def video_feed():
-    from flask import Response
-    return Response(generate(),
+    return Response(_mjpeg_stream(),
                     mimetype="multipart/x-mixed-replace; boundary=frame")
-@app.route("/")
-def index():
-    return render_template("index.html")
 
+
+# --- manual joystick control (original) ---
 @app.route("/update", methods=["POST"])
 def update():
-    if current_values["ai_mode"]:
+    if state["ai_mode"]:
         return jsonify({"status": "ai_mode_active"})
-
-    data = request.get_json()
-    latency = int(current_values["latency"])
-    jitter = int(current_values["jitter"])
-
-    jitter_amount = random.randint(-jitter, jitter) if jitter > 0 else 0
-    actual_delay = max(0, latency + jitter_amount)
-    if actual_delay > 0:
-        time.sleep(actual_delay / 1000)
-
-    current_values["x"] = data.get("x", 50)
-    current_values["y"] = data.get("y", 50)
-
-    print(f"X: {data.get('x')}, Y: {data.get('y')}, Latency: {latency}ms, Jitter: ±{jitter}ms")
+    data = request.get_json() or {}
+    jit = random.randint(-state["jitter"], state["jitter"]) if state["jitter"] > 0 else 0
+    delay = max(0, state["latency"] + jit)
+    if delay > 0:
+        time.sleep(delay / 1000.0)
+    state["x"] = data.get("x", 50)
+    state["y"] = data.get("y", 50)
+    ai_controller.esp32.send(int(state["x"]), int(state["y"]))
     return jsonify({"status": "ok"})
+
 
 @app.route("/settings", methods=["POST"])
 def settings():
-    data = request.get_json()
-    current_values["latency"] = data.get("latency", 0)
-    current_values["jitter"] = data.get("jitter", 0)
-
-    if AI_AVAILABLE:
-        ai_controller.set_latency(
-            current_values["latency"],
-            current_values["jitter"]
-        )
-
-    print(f"Latency: {current_values['latency']}ms, Jitter: ±{current_values['jitter']}ms")
+    data = request.get_json() or {}
+    state["latency"] = int(data.get("latency", 0))
+    state["jitter"]  = int(data.get("jitter", 0))
+    ai_controller.set_latency(state["latency"], state["jitter"])
     return jsonify({"status": "ok"})
 
+
+# --- AI control ---
 @app.route("/ai", methods=["POST"])
 def toggle_ai():
-    if not AI_AVAILABLE:
-        return jsonify({"status": "error", "message": "AI not available"})
-
-    data = request.get_json()
-    enable = data.get("enable", False)
-
+    data = request.get_json() or {}
+    enable = bool(data.get("enable", False))
+    if enable and ai_controller.path is None:
+        return jsonify({
+            "status": "error",
+            "message": "Plan a path first (mark start and end, then Plan Path)",
+        }), 400
     if enable:
         ai_controller.start()
-        current_values["ai_mode"] = True
-        print("AI mode ON")
     else:
         ai_controller.stop()
-        current_values["ai_mode"] = False
-        print("AI mode OFF")
+    state["ai_mode"] = enable
+    return jsonify({"status": "ok", "ai_mode": enable})
 
-    return jsonify({"status": "ok", "ai_mode": current_values["ai_mode"]})
+
+@app.route("/set_start_end", methods=["POST"])
+def set_start_end():
+    data = request.get_json() or {}
+    start = data.get("start")
+    end   = data.get("end")
+    if not start or not end:
+        return jsonify({"status": "error", "message": "need 'start' and 'end' [x, y]"}), 400
+    ai_controller.set_start_end(start, end)
+    return jsonify({"status": "ok"})
+
+
+@app.route("/plan_path", methods=["POST"])
+def plan_path_route():
+    with frame_lock:
+        f = None if raw_frame is None else raw_frame.copy()
+    if f is None:
+        return jsonify({"status": "error", "message": "no camera frame yet"}), 503
+    ok, msg = ai_controller.plan(f)
+    return jsonify({"status": "ok" if ok else "error", "message": msg})
+
+
+@app.route("/clear_plan", methods=["POST"])
+def clear_plan():
+    ai_controller.clear_plan()
+    return jsonify({"status": "ok"})
+
+
+@app.route("/set_gains", methods=["POST"])
+def set_gains():
+    data = request.get_json() or {}
+    ai_controller.set_gains(
+        kp=data.get("kp"),
+        kd=data.get("kd"),
+        tilt_gain=data.get("tilt_gain"),
+        lookahead_px=data.get("lookahead_px"),
+    )
+    return jsonify({
+        "status": "ok",
+        "kp": ai_controller.pid.kp,
+        "kd": ai_controller.pid.kd,
+        "tilt_gain": ai_controller.tilt_gain,
+        "lookahead_px": ai_controller.lookahead_px,
+    })
 
 
 @app.route("/status")
 def status():
-    return jsonify(current_values)
-
-
+    return jsonify({
+        **state,
+        "ball": ai_controller.last_ball,
+        "target": ai_controller.last_target,
+        "tilt": ai_controller.last_tilt,
+        "path_len": len(ai_controller.path) if ai_controller.path else 0,
+        "fps": round(ai_controller.last_fps, 1),
+        "gains": {
+            "kp": ai_controller.pid.kp,
+            "kd": ai_controller.pid.kd,
+            "tilt_gain": ai_controller.tilt_gain,
+            "lookahead_px": ai_controller.lookahead_px,
+        },
+    })
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=False)
+    # threaded=True is important so /video_feed and /status can overlap
+    app.run(host="0.0.0.0", port=5000, debug=False, threaded=True)

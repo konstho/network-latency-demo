@@ -156,6 +156,86 @@
             color: #005f7a;
             margin-bottom: 20px;
         }
+
+        /* --- Nokia-style button used across AI setup and AI mode --- */
+        .nokia-btn {
+            background: #00d4ff22;
+            border: 1px solid #00d4ff;
+            color: #00d4ff;
+            padding: 10px 18px;
+            border-radius: 8px;
+            cursor: pointer;
+            letter-spacing: 2px;
+            font-size: 0.75em;
+            text-transform: uppercase;
+            font-family: inherit;
+            transition: background 0.15s;
+        }
+        .nokia-btn:hover { background: #00d4ff33; }
+        .nokia-btn.active {
+            background: #00d4ff;
+            color: #0a0a0f;
+            box-shadow: 0 0 15px #00d4ff88;
+        }
+        .nokia-btn.secondary {
+            border-color: #005f7a;
+            color: #005f7a;
+        }
+        .nokia-btn.secondary:hover { background: #00d4ff11; }
+
+        /* --- Camera feed container with click-overlay canvas --- */
+        .video-container {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 4 / 3;
+            border-radius: 8px;
+            overflow: hidden;
+            background: #000;
+        }
+        .video-container img,
+        .video-container canvas {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%;
+            height: 100%;
+        }
+        .video-container canvas {
+            pointer-events: none;
+        }
+        .video-container.picking canvas {
+            pointer-events: auto;
+            cursor: crosshair;
+        }
+
+        /* --- AI setup card layout --- */
+        .setup-status {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 15px;
+            font-size: 0.75em;
+            letter-spacing: 2px;
+            color: #005f7a;
+        }
+        .setup-status .val {
+            color: #00d4ff;
+            margin-left: 6px;
+        }
+        .setup-buttons {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 12px;
+        }
+        .setup-buttons .nokia-btn { flex: 1 1 auto; }
+        #planMsg {
+            font-size: 0.75em;
+            letter-spacing: 2px;
+            color: #005f7a;
+            text-transform: uppercase;
+            min-height: 1em;
+        }
+        #planMsg.ok    { color: #00d4ff; }
+        #planMsg.error { color: #ff6b6b; }
     </style>
 </head>
 <body>
@@ -182,7 +262,7 @@
             <div class="label">Jitter ms</div>
         </div>
     </div>
-	
+
     <div class="card">
         <h2>Network Settings</h2>
         <div class="slider-row">
@@ -206,27 +286,35 @@
         <canvas id="latencyChart"></canvas>
     </div>
 
-<div class="card">
-    <h2>Live Camera Feed</h2>
-    <img src="/video_feed" style="width:100%; border-radius:8px;">
-</div>
+    <div class="card">
+        <h2>Live Camera Feed</h2>
+        <div class="video-container" id="videoContainer">
+            <img src="/video_feed" id="streamImg" alt="camera">
+            <canvas id="overlayCanvas" width="640" height="480"></canvas>
+        </div>
+    </div>
 
-	
-<div class="card">
+    <div class="card">
+        <h2>AI Setup</h2>
+        <div class="setup-status">
+            <div>Start:<span class="val" id="startStatus">—</span></div>
+            <div>End:<span class="val" id="endStatus">—</span></div>
+            <div>Path:<span class="val" id="pathStatus">—</span></div>
+        </div>
+        <div class="setup-buttons">
+            <button class="nokia-btn" id="pickStartBtn" onclick="pickMode('start')">Pick Start</button>
+            <button class="nokia-btn" id="pickEndBtn"   onclick="pickMode('end')">Pick End</button>
+            <button class="nokia-btn" id="planBtn"      onclick="planPath()">Plan Path</button>
+            <button class="nokia-btn secondary" id="clearBtn" onclick="clearPlan()">Reset</button>
+        </div>
+        <div id="planMsg">Mark start (arrow) and end (*), then plan path</div>
+    </div>
+
+    <div class="card">
         <h2>AI Mode</h2>
         <div style="display: flex; justify-content: space-between; align-items: center;">
             <span style="letter-spacing: 2px; font-size: 0.9em;">Let AI play the maze</span>
-            <button id="aiBtn" onclick="toggleAI()" style="
-                background: #00d4ff22;
-                border: 1px solid #00d4ff;
-                color: #00d4ff;
-                padding: 10px 25px;
-                border-radius: 8px;
-                cursor: pointer;
-                letter-spacing: 2px;
-                font-size: 0.85em;
-                text-transform: uppercase;
-            ">Enable AI</button>
+            <button id="aiBtn" class="nokia-btn" onclick="toggleAI()">Enable AI</button>
         </div>
         <div id="aiStatus" style="
             margin-top: 15px;
@@ -236,8 +324,6 @@
             text-transform: uppercase;
         ">AI is off</div>
     </div>
-
-
 
     <div id="gyro-status"></div>
 
@@ -249,7 +335,7 @@
 
     document.getElementById("modeLabel").innerText = isMobile ? "Phone Gyroscope" : "Keyboard Arrows";
 
-    // Chart setup
+    // -------- chart setup --------
     const ctx = document.getElementById("latencyChart").getContext("2d");
     const maxPoints = 30;
     const labels = Array(maxPoints).fill("");
@@ -266,40 +352,24 @@
                     data: latencyData,
                     borderColor: "#00d4ff",
                     backgroundColor: "#00d4ff11",
-                    borderWidth: 2,
-                    pointRadius: 0,
-                    tension: 0.4,
-                    fill: true
+                    borderWidth: 2, pointRadius: 0, tension: 0.4, fill: true
                 },
                 {
                     label: "Actual Delay with Jitter (ms)",
                     data: actualDelayData,
                     borderColor: "#ff6b6b",
                     backgroundColor: "#ff6b6b11",
-                    borderWidth: 2,
-                    pointRadius: 0,
-                    tension: 0.4,
-                    fill: true
+                    borderWidth: 2, pointRadius: 0, tension: 0.4, fill: true
                 }
             ]
         },
         options: {
             animation: false,
             scales: {
-                x: {
-                    display: false
-                },
-                y: {
-                    min: 0,
-                    ticks: { color: "#005f7a" },
-                    grid: { color: "#00d4ff11" }
-                }
+                x: { display: false },
+                y: { min: 0, ticks: { color: "#005f7a" }, grid: { color: "#00d4ff11" } }
             },
-            plugins: {
-                legend: {
-                    labels: { color: "#00d4ff", font: { size: 10 } }
-                }
-            }
+            plugins: { legend: { labels: { color: "#00d4ff", font: { size: 10 } } } }
         }
     });
 
@@ -307,18 +377,13 @@
         const jitter = currentJitter;
         const randomJitter = Math.floor(Math.random() * (jitter * 2 + 1)) - jitter;
         const actualDelay = Math.max(0, currentLatency + randomJitter);
-
-        latencyData.push(currentLatency);
-        latencyData.shift();
-        actualDelayData.push(actualDelay);
-        actualDelayData.shift();
-
+        latencyData.push(currentLatency); latencyData.shift();
+        actualDelayData.push(actualDelay); actualDelayData.shift();
         chart.update();
     }
-
     setInterval(updateGraph, 500);
 
-    // Send tilt to server
+    // -------- manual tilt sending --------
     function sendTilt() {
         document.getElementById("dispX").innerText = Math.round(x);
         document.getElementById("dispY").innerText = Math.round(y);
@@ -329,15 +394,14 @@
         });
     }
 
-    // Send settings to server
     function sendSettings() {
         const latency = document.getElementById("latency").value;
-        const jitter = document.getElementById("jitter").value;
+        const jitter  = document.getElementById("jitter").value;
         currentLatency = parseInt(latency);
-        currentJitter = parseInt(jitter);
-        document.getElementById("latVal").innerText = latency;
+        currentJitter  = parseInt(jitter);
+        document.getElementById("latVal").innerText    = latency;
         document.getElementById("jitterVal").innerText = jitter;
-        document.getElementById("dispLat").innerText = latency;
+        document.getElementById("dispLat").innerText    = latency;
         document.getElementById("dispJitter").innerText = jitter;
         fetch("/settings", {
             method: "POST",
@@ -349,7 +413,7 @@
     document.getElementById("latency").addEventListener("input", sendSettings);
     document.getElementById("jitter").addEventListener("input", sendSettings);
 
-    // PHONE - Gyroscope
+    // -------- gyroscope (phone) --------
     if (isMobile) {
         if (typeof DeviceOrientationEvent !== "undefined" &&
             typeof DeviceOrientationEvent.requestPermission === "function") {
@@ -370,54 +434,171 @@
     function startGyro() {
         window.addEventListener("deviceorientation", (e) => {
             x = Math.min(100, Math.max(0, (e.gamma + 45) * (100 / 90)));
-            y = Math.min(100, Math.max(0, (e.beta + 45) * (100 / 90)));
+            y = Math.min(100, Math.max(0, (e.beta  + 45) * (100 / 90)));
             sendTilt();
         });
     }
 
-    // LAPTOP - Arrow keys
+    // -------- arrow keys (laptop) --------
     if (!isMobile) {
         const keys = {};
         document.addEventListener("keydown", e => keys[e.key] = true);
-        document.addEventListener("keyup", e => keys[e.key] = false);
+        document.addEventListener("keyup",   e => keys[e.key] = false);
 
         setInterval(() => {
             let moved = false;
-            if (keys["ArrowLeft"])  { x = Math.max(0, x - 2); moved = true; }
+            if (keys["ArrowLeft"])  { x = Math.max(0,   x - 2); moved = true; }
             if (keys["ArrowRight"]) { x = Math.min(100, x + 2); moved = true; }
-            if (keys["ArrowUp"])    { y = Math.max(0, y - 2); moved = true; }
+            if (keys["ArrowUp"])    { y = Math.max(0,   y - 2); moved = true; }
             if (keys["ArrowDown"])  { y = Math.min(100, y + 2); moved = true; }
             if (moved) sendTilt();
         }, 50);
     }
 
+    // =====================================================================
+    // AI SETUP — click to mark start/end, plan path, enable AI
+    // =====================================================================
 
-let aiActive = false;
+    const videoContainer = document.getElementById("videoContainer");
+    const overlayCanvas  = document.getElementById("overlayCanvas");
+    const octx           = overlayCanvas.getContext("2d");
+
+    let clickMode = null;           // "start" | "end" | null
+    let startXY   = null;
+    let endXY     = null;
+    let pathPlanned = false;
+
+    function pickMode(which) {
+        clickMode = (clickMode === which) ? null : which;
+        videoContainer.classList.toggle("picking", clickMode !== null);
+        document.getElementById("pickStartBtn").classList.toggle("active", clickMode === "start");
+        document.getElementById("pickEndBtn").classList.toggle  ("active", clickMode === "end");
+    }
+
+    overlayCanvas.addEventListener("click", async (e) => {
+        if (!clickMode) return;
+        const rect = overlayCanvas.getBoundingClientRect();
+        // convert CSS px back to the canvas's 640x480 intrinsic coords
+        const cx = Math.round((e.clientX - rect.left) * (overlayCanvas.width  / rect.width));
+        const cy = Math.round((e.clientY - rect.top)  * (overlayCanvas.height / rect.height));
+
+        if (clickMode === "start") { startXY = [cx, cy]; }
+        else                       { endXY   = [cx, cy]; }
+
+        pickMode(null);   // exit pick mode after one click
+        redrawOverlay();
+        updateSetupStatus();
+
+        if (startXY && endXY) {
+            await fetch("/set_start_end", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ start: startXY, end: endXY })
+            });
+        }
+    });
+
+    function redrawOverlay() {
+        octx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+        if (startXY) {
+            octx.strokeStyle = "#00d4ff"; octx.lineWidth = 4;
+            octx.shadowBlur = 15; octx.shadowColor = "#00d4ff";
+            octx.beginPath(); octx.arc(startXY[0], startXY[1], 14, 0, 2*Math.PI); octx.stroke();
+            octx.beginPath(); octx.moveTo(startXY[0] - 8, startXY[1]); octx.lineTo(startXY[0] + 8, startXY[1]); octx.stroke();
+            octx.beginPath(); octx.moveTo(startXY[0], startXY[1] - 8); octx.lineTo(startXY[0], startXY[1] + 8); octx.stroke();
+        }
+        if (endXY) {
+            octx.strokeStyle = "#ff6b6b"; octx.lineWidth = 4;
+            octx.shadowBlur = 15; octx.shadowColor = "#ff6b6b";
+            octx.beginPath(); octx.arc(endXY[0], endXY[1], 14, 0, 2*Math.PI); octx.stroke();
+            octx.beginPath(); octx.moveTo(endXY[0] - 8, endXY[1] - 8); octx.lineTo(endXY[0] + 8, endXY[1] + 8); octx.stroke();
+            octx.beginPath(); octx.moveTo(endXY[0] + 8, endXY[1] - 8); octx.lineTo(endXY[0] - 8, endXY[1] + 8); octx.stroke();
+        }
+        octx.shadowBlur = 0;
+    }
+
+    function updateSetupStatus() {
+        document.getElementById("startStatus").innerText =
+            startXY ? `${startXY[0]}, ${startXY[1]}` : "—";
+        document.getElementById("endStatus").innerText =
+            endXY   ? `${endXY[0]}, ${endXY[1]}`     : "—";
+        document.getElementById("pathStatus").innerText =
+            pathPlanned ? "planned" : "—";
+    }
+
+    function setPlanMsg(text, cls) {
+        const el = document.getElementById("planMsg");
+        el.innerText = text;
+        el.className = cls || "";
+    }
+
+    async function planPath() {
+        if (!startXY || !endXY) {
+            setPlanMsg("Set start and end first", "error");
+            return;
+        }
+        setPlanMsg("Planning...", "");
+        try {
+            const r = await fetch("/plan_path", { method: "POST" });
+            const j = await r.json();
+            if (j.status === "ok") {
+                pathPlanned = true;
+                updateSetupStatus();
+                setPlanMsg(j.message || "Path planned", "ok");
+            } else {
+                pathPlanned = false;
+                updateSetupStatus();
+                setPlanMsg(j.message || "Planning failed", "error");
+            }
+        } catch (e) {
+            setPlanMsg("Request failed", "error");
+        }
+    }
+
+    async function clearPlan() {
+        startXY = null; endXY = null; pathPlanned = false;
+        clickMode = null;
+        videoContainer.classList.remove("picking");
+        document.getElementById("pickStartBtn").classList.remove("active");
+        document.getElementById("pickEndBtn").classList.remove("active");
+        redrawOverlay();
+        updateSetupStatus();
+        setPlanMsg("Reset — mark start and end", "");
+        await fetch("/clear_plan", { method: "POST" });
+        // also turn AI off if it was on
+        if (aiActive) toggleAI();
+    }
+
+    // =====================================================================
+    // AI toggle (existing, with friendlier error handling)
+    // =====================================================================
+
+    let aiActive = false;
 
     function toggleAI() {
-        aiActive = !aiActive;
-        const btn = document.getElementById("aiBtn");
+        const newState = !aiActive;
+        const btn    = document.getElementById("aiBtn");
         const status = document.getElementById("aiStatus");
 
         fetch("/ai", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ enable: aiActive })
-        }).then(res => res.json()).then(data => {
-            if (data.status === "ok") {
+            body: JSON.stringify({ enable: newState })
+        })
+        .then(res => res.json().then(data => ({ ok: res.ok, data })))
+        .then(({ ok, data }) => {
+            if (ok && data.status === "ok") {
+                aiActive = newState;
                 btn.innerText = aiActive ? "Disable AI" : "Enable AI";
-                btn.style.background = aiActive ? "#00d4ff33" : "#00d4ff22";
+                btn.classList.toggle("active", aiActive);
                 status.innerText = aiActive ? "AI is playing..." : "AI is off";
                 status.style.color = aiActive ? "#00d4ff" : "#005f7a";
             } else {
-                alert("AI not available yet — camera needed!");
-                aiActive = false;
+                setPlanMsg(data.message || "AI could not start", "error");
             }
-        });
+        })
+        .catch(() => setPlanMsg("AI request failed", "error"));
     }
-
-
-
 </script>
 </body>
 </html>
