@@ -1,19 +1,20 @@
 """
 AIController — orchestrates vision, control, and ESP32 output.
 
+Detection backend is switchable at runtime:
+  - "hsv":   classical color thresholding (vision.detect_red_object)
+  - "hailo": YOLO on the AI HAT+ 2 (vision_hailo.HailoDetector)
+
 Every incoming frame passes through process_frame(), which:
-  1. Detects the red object
-  2. Smooths the position and estimates velocity
+  1. Detects the ball (method depends on selected backend)
+  2. Smooths position and estimates velocity
   3. If AI is running AND a path exists:
        - Picks a lookahead target on the path
        - Runs PD to compute a correction vector
-       - Maps that to the 0..100 tilt range
+       - Maps to 0..100 tilt range
        - (Optionally sleeps for injected latency)
-       - Sends to ESP32 (or prints, if no ESP32 connected)
-  4. Returns an annotated frame + telemetry dict for the UI
-
-Detection always runs, even when AI is off — that way the live stream shows
-you whether your red-object detection is working before you commit to AI mode.
+       - Sends to ESP32 (or prints if no ESP32 connected)
+  4. Returns annotated frame + telemetry dict for the UI
 """
 
 import random
@@ -23,11 +24,19 @@ import vision
 import controller as ctrl
 from esp32 import ESP32Comm
 
+# vision_hailo is optional — catch import errors so the app still runs
+# on dev machines without Hailo installed.
+try:
+    import vision_hailo
+    HAILO_OK = True
+except Exception as _e:
+    vision_hailo = None
+    HAILO_OK = False
+    _hailo_err = _e
+
 
 class AIController:
-    def __init__(self, esp32_port=None):
-        # ESP32 is optional. Passing port=None keeps it in simulation mode
-        # and just prints what it would have sent.
+    def __init__(self, esp32_port=None, detector="hsv"):
         self.esp32 = ESP32Comm(port=esp32_port)
         self.esp32.connect()
 
@@ -38,22 +47,59 @@ class AIController:
         self.latency_ms = 0
         self.jitter_ms = 0
 
+        # Detector state
+        self.detector = "hsv"
+        self._hailo = None
+        self.last_inference_ms = 0.0
+
         # Planning state
         self.start_xy = None
         self.end_xy = None
         self.path = None
-        self.last_skel = None  # for debugging, if you want to render it
+        self.last_skel = None
 
         # Tuning knobs
-        self.tilt_gain = 0.25     # pixels of error → tilt units (each)
-        self.lookahead_px = 50    # how far ahead the pure-pursuit target sits
+        self.tilt_gain = 0.25
+        self.lookahead_px = 50
 
-        # Telemetry for /status
-        self.last_ball = None     # raw detection (cx, cy, r, area)
+        # Telemetry
+        self.last_ball = None
         self.last_target = None
         self.last_tilt = (50.0, 50.0)
         self.last_fps = 0.0
         self._last_frame_t = None
+
+        self.set_detector(detector)
+
+    # ----- detector -----
+    def set_detector(self, name):
+        name = (name or "hsv").lower()
+        if name == "hailo":
+            if not HAILO_OK:
+                print(f"[AI] Hailo requested but not available: {_hailo_err}")
+                print(f"[AI] Falling back to HSV")
+                self.detector = "hsv"
+                return False
+            if self._hailo is None:
+                try:
+                    self._hailo = vision_hailo.HailoDetector()
+                    self._hailo.open()
+                except Exception as e:
+                    print(f"[AI] Failed to initialize Hailo: {e}")
+                    self.detector = "hsv"
+                    return False
+            self.detector = "hailo"
+            print("[AI] Detector: Hailo (YOLO on AI HAT+ 2)")
+            return True
+        else:
+            self.detector = "hsv"
+            print("[AI] Detector: HSV (classical color threshold)")
+            return True
+
+    def shutdown(self):
+        if self._hailo is not None:
+            self._hailo.close()
+            self._hailo = None
 
     # ----- configuration -----
     def set_start_end(self, start_xy, end_xy):
@@ -109,22 +155,29 @@ class AIController:
             time.sleep(d / 1000.0)
         return d
 
+    def _detect(self, bgr):
+        if self.detector == "hailo" and self._hailo is not None:
+            try:
+                det = self._hailo.detect_ball(bgr)
+                self.last_inference_ms = self._hailo.last_inference_ms
+                return det
+            except Exception as e:
+                print(f"[AI] Hailo detect error: {e} — falling back to HSV once")
+                self.last_inference_ms = 0.0
+                return vision.detect_red_object(bgr)
+        self.last_inference_ms = 0.0
+        return vision.detect_red_object(bgr)
+
     def process_frame(self, bgr_frame):
-        """
-        Main entry point. Returns (annotated_frame, telemetry_dict).
-        Safe to call every frame.
-        """
         now = time.time()
         if self._last_frame_t is not None:
             dt = now - self._last_frame_t
             if dt > 0:
-                # EMA for display-smoothing fps
                 inst = 1.0 / dt
                 self.last_fps = 0.8 * self.last_fps + 0.2 * inst if self.last_fps else inst
         self._last_frame_t = now
 
-        # Detection always runs
-        det = vision.detect_red_object(bgr_frame)
+        det = self._detect(bgr_frame)
         self.last_ball = det
         ball_pos = self.tracker.update(det)
 
@@ -133,26 +186,27 @@ class AIController:
         if self.running and ball_pos is not None and self.path:
             target = vision.lookahead_target(ball_pos, self.path, self.lookahead_px)
             self.last_target = target
-
             ux, uy = self.pid.update(ball_pos, self.tracker.vel, target)
             tilt_x, tilt_y = self._clamp_tilt(ux, uy)
             self.last_tilt = (tilt_x, tilt_y)
-
             self._apply_latency()
             self.esp32.send(int(tilt_x), int(tilt_y))
             tilt_cmd = (tilt_x, tilt_y)
 
         status = [
-            f"AI: {'ON' if self.running else 'OFF'}   FPS: {self.last_fps:4.1f}",
+            f"AI: {'ON' if self.running else 'OFF'}   "
+            f"DET: {self.detector.upper()}   "
+            f"FPS: {self.last_fps:4.1f}",
             f"Ball: {'YES @ ('+str(det[0])+','+str(det[1])+')' if det else 'not detected'}",
             f"Path: {str(len(self.path))+' pts' if self.path else 'not planned'}",
         ]
+        if self.detector == "hailo" and self.last_inference_ms > 0:
+            status.append(f"Hailo inference: {self.last_inference_ms:.1f} ms")
         if tilt_cmd is not None:
             status.append(f"Tilt: x={tilt_cmd[0]:.1f}  y={tilt_cmd[1]:.1f}")
         if self.latency_ms:
             status.append(f"Injected lat {self.latency_ms}ms  jit +/-{self.jitter_ms}ms")
 
-        # tilt arrow rendered as deviation from neutral (50, 50)
         tilt_vec = None
         if tilt_cmd is not None:
             tilt_vec = (tilt_cmd[0] - 50.0, tilt_cmd[1] - 50.0)
@@ -173,4 +227,6 @@ class AIController:
             "tilt": tilt_cmd,
             "path_len": len(self.path) if self.path else 0,
             "fps": round(self.last_fps, 1),
+            "detector": self.detector,
+            "inference_ms": round(self.last_inference_ms, 1),
         }

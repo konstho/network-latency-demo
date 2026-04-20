@@ -262,7 +262,7 @@
             <div class="label">Jitter ms</div>
         </div>
     </div>
-
+	
     <div class="card">
         <h2>Network Settings</h2>
         <div class="slider-row">
@@ -297,9 +297,16 @@
     <div class="card">
         <h2>AI Setup</h2>
         <div class="setup-status">
+            <div>Detector:<span class="val" id="detectorStatus">HSV</span></div>
+            <div>Path:<span class="val" id="pathStatus">—</span></div>
+        </div>
+        <div class="setup-buttons" style="margin-bottom: 8px;">
+            <button class="nokia-btn active" id="detHsvBtn"   onclick="setDetector('hsv')">HSV (classical)</button>
+            <button class="nokia-btn"        id="detHailoBtn" onclick="setDetector('hailo')">Hailo (YOLO)</button>
+        </div>
+        <div class="setup-status">
             <div>Start:<span class="val" id="startStatus">—</span></div>
             <div>End:<span class="val" id="endStatus">—</span></div>
-            <div>Path:<span class="val" id="pathStatus">—</span></div>
         </div>
         <div class="setup-buttons">
             <button class="nokia-btn" id="pickStartBtn" onclick="pickMode('start')">Pick Start</button>
@@ -567,6 +574,28 @@
         await fetch("/clear_plan", { method: "POST" });
         // also turn AI off if it was on
         if (aiActive) toggleAI();
+    }
+
+    async function setDetector(name) {
+        try {
+            const r = await fetch("/set_detector", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ detector: name })
+            });
+            const j = await r.json();
+            const actual = j.detector || name;
+            document.getElementById("detectorStatus").innerText = actual.toUpperCase();
+            document.getElementById("detHsvBtn").classList.toggle  ("active", actual === "hsv");
+            document.getElementById("detHailoBtn").classList.toggle("active", actual === "hailo");
+            if (j.status === "fallback") {
+                setPlanMsg("Hailo not available, using HSV", "error");
+            } else {
+                setPlanMsg(`Detector: ${actual.toUpperCase()}`, "ok");
+            }
+        } catch (e) {
+            setPlanMsg("Could not change detector", "error");
+        }
     }
 
     // =====================================================================

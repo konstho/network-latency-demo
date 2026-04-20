@@ -208,6 +208,17 @@ def set_gains():
     })
 
 
+@app.route("/set_detector", methods=["POST"])
+def set_detector():
+    data = request.get_json() or {}
+    name = data.get("detector", "hsv")
+    ok = ai_controller.set_detector(name)
+    return jsonify({
+        "status": "ok" if ok else "fallback",
+        "detector": ai_controller.detector,
+    })
+
+
 @app.route("/status")
 def status():
     return jsonify({
@@ -217,6 +228,8 @@ def status():
         "tilt": ai_controller.last_tilt,
         "path_len": len(ai_controller.path) if ai_controller.path else 0,
         "fps": round(ai_controller.last_fps, 1),
+        "detector": ai_controller.detector,
+        "inference_ms": round(ai_controller.last_inference_ms, 1),
         "gains": {
             "kp": ai_controller.pid.kp,
             "kd": ai_controller.pid.kd,
