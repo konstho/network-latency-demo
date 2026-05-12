@@ -1,28 +1,18 @@
 """
-Hailo-accelerated ball detector.
+Hailo-accelerated ball detector using a CUSTOM-trained YOLOv8n model.
 
-Same public API as vision.detect_red_object() so ai.py can swap detectors
-without caring which is in use:
+Same public API as the previous COCO-based version:
+    det.detect_ball(bgr_frame)  # -> (cx, cy, radius, area) or None
 
-    det = detect_ball_hailo(bgr_frame, hailo_ctx)
-    # -> (cx, cy, radius, area) or None
-
-The hailo_ctx is a HailoDetector instance created once at startup.
-The detector is stateful (holds the loaded model + input buffer), so we
-wrap it in a class instead of a module-level singleton — makes it easy
-to shut down cleanly when the app stops.
-
-Why this over HSV color thresholding:
-- Works with the stock metal ball (no painting/taping needed)
-- Robust to lighting changes (the Nokia demo space likely has different
-  lighting than our dev setup)
-- Rejects red distractor objects that would confuse HSV detection
-
-Runs at ~30 FPS on the Hailo-10H (measured: 34ms per 640x640 inference).
+Key differences from COCO version:
+- Custom model: 1 class (ball), trained on ~85 maze images
+- Cut before NMS: model outputs 6 raw conv tensors, we do decoding+NMS in Python
+- HEF compiled at /home/konsta/maze_control/ball_model.hef
 """
 
 import cv2
 import numpy as np
+import time
 
 try:
     from picamera2.devices import Hailo
@@ -32,61 +22,35 @@ except Exception as _e:
     _hailo_import_error = _e
 
 
-# COCO class indices we care about for "ball-like" objects.
-# YOLOv8 is trained on COCO. The metal ball looks most like "sports ball"
-# but we accept a few other small-round classes as fallbacks in case
-# the model mislabels under this specific lighting/shape.
-BALL_CLASS_IDS = {
-    32,   # sports ball  <- primary
-    29,   # frisbee      (small round-ish object)
-    # Anything else we want to accept? Add IDs here. Don't add too many,
-    # or we'll detect cups/donuts and steer toward them.
-}
-BALL_CLASS_NAMES = {
-    0: "person", 29: "frisbee", 32: "sports ball", 39: "bottle",
-    41: "cup", 44: "spoon", 47: "apple", 49: "orange", 54: "donut",
-    74: "clock", 73: "book",
-}  # for debug logging only
-
-DEFAULT_HEF = "/usr/share/hailo-models/yolov8m_h10.hef"
+DEFAULT_HEF = "/home/konsta/maze_control/ball_model.hef"
 
 
 class HailoDetector:
     """
-    Loads the YOLO HEF once and runs inference on BGR frames.
-
-    Usage:
-        det = HailoDetector()
-        det.open()
-        result = det.detect_ball(bgr_frame)   # -> (cx, cy, r, area) or None
-        det.close()
+    Custom YOLOv8n model with 1 class (ball).
+    Outputs raw conv tensors; we decode + NMS in Python.
     """
 
     def __init__(self, hef_path=DEFAULT_HEF, score_threshold=0.25,
-                 accepted_classes=None):
+                 iou_threshold=0.45):
         if not HAILO_AVAILABLE:
             raise RuntimeError(
                 f"picamera2.devices.Hailo not importable: {_hailo_import_error}"
             )
         self.hef_path = hef_path
         self.score_threshold = score_threshold
-        self.accepted_classes = (
-            set(accepted_classes) if accepted_classes else set(BALL_CLASS_IDS)
-        )
+        self.iou_threshold = iou_threshold
         self._hailo = None
         self._in_h = None
         self._in_w = None
 
-        # Telemetry
         self.last_inference_ms = 0.0
-        self.last_raw_detections = []   # list of (class_id, score, box_px)
-        self.last_best = None           # picked-as-ball detection
+        self.last_raw_detections = []
+        self.last_best = None
 
     def open(self):
         if self._hailo is not None:
             return
-        # Hailo() is a context manager but we also manually drive it so
-        # it can live for the whole app lifetime.
         self._hailo = Hailo(self.hef_path)
         self._hailo.__enter__()
         self._in_h, self._in_w, _ = self._hailo.get_input_shape()
@@ -94,120 +58,137 @@ class HailoDetector:
 
     def close(self):
         if self._hailo is not None:
+            hailo = self._hailo
+            self._hailo = None
             try:
-                self._hailo.__exit__(None, None, None)
+                hailo.__exit__(None, None, None)
             except Exception as e:
                 print(f"[Hailo] close error: {e}")
-            self._hailo = None
 
-    # ---------- internal: pre/post-process ----------
     def _preprocess(self, bgr):
-        """
-        The YOLO HEF expects a 640x640 RGB image. Our frames come in at
-        whatever size the camera was configured to, as BGR.
-
-        We resize-with-letterbox to preserve aspect ratio. Without the
-        letterbox, distortion hurts small-object accuracy.
-        """
         h, w = bgr.shape[:2]
-        target = self._in_w   # model is square
+        target = self._in_w
         scale = min(target / w, target / h)
         new_w, new_h = int(round(w * scale)), int(round(h * scale))
         resized = cv2.resize(bgr, (new_w, new_h), interpolation=cv2.INTER_LINEAR)
-        # paste into 640x640 canvas, top-left
         canvas = np.zeros((target, target, 3), dtype=np.uint8)
         canvas[:new_h, :new_w] = resized
         rgb = cv2.cvtColor(canvas, cv2.COLOR_BGR2RGB)
         return rgb, scale, (new_w, new_h)
 
-    def _postprocess(self, results, scale, padded_size, orig_shape):
+    def _decode_yolov8(self, outputs, num_classes=1):
         """
-        results: list of 80 lists (one per COCO class).
-          Each entry is an array of detections with format [y0, x0, y1, x1, score]
-          in NORMALIZED coords (0..1) relative to the 640x640 input.
-
-        We convert normalized -> padded pixels -> original frame pixels,
-        undoing the letterbox scale.
+        Decode raw YOLOv8 head outputs.
+        outputs is a dict with 6 tensors of shape (H, W, C):
+          conv41 (80,80,64), conv42 (80,80,1)  - stride 8
+          conv52 (40,40,64), conv53 (40,40,1)  - stride 16
+          conv62 (20,20,64), conv63 (20,20,1)  - stride 32
         """
-        orig_h, orig_w = orig_shape[:2]
-        pad_w, pad_h = padded_size
-        raw = []
-        for cls_id, dets in enumerate(results):
-            if dets is None:
-                continue
-            # dets might be a list/array; be defensive
-            try:
-                n = len(dets)
-            except TypeError:
-                continue
-            for d in dets:
-                if len(d) < 5:
-                    continue
-                y0, x0, y1, x1, score = float(d[0]), float(d[1]), float(d[2]), float(d[3]), float(d[4])
-                if score < self.score_threshold:
-                    continue
-                # normalized 0..1 in 640x640 letterboxed canvas
-                # → pixel coords in the 640x640 canvas
-                X0 = x0 * self._in_w
-                X1 = x1 * self._in_w
-                Y0 = y0 * self._in_h
-                Y1 = y1 * self._in_h
-                # undo letterbox: the image was pasted at (0,0) scaled by `scale`
-                bx0 = X0 / scale
-                by0 = Y0 / scale
-                bx1 = X1 / scale
-                by1 = Y1 / scale
-                # clamp
-                bx0 = max(0.0, min(orig_w - 1, bx0))
-                bx1 = max(0.0, min(orig_w - 1, bx1))
-                by0 = max(0.0, min(orig_h - 1, by0))
-                by1 = max(0.0, min(orig_h - 1, by1))
-                raw.append({
-                    "class_id": cls_id,
-                    "score": score,
-                    "bbox": (bx0, by0, bx1, by1),
-                })
-        return raw
+        if isinstance(outputs, dict):
+            outputs = list(outputs.values())
 
-    # ---------- public ----------
-    def detect_all(self, bgr_frame):
-        """Return every detection above threshold (any class)."""
-        if self._hailo is None:
-            self.open()
-        import time
-        rgb, scale, padded_size = self._preprocess(bgr_frame)
-        t0 = time.time()
-        results = self._hailo.run(rgb)
-        self.last_inference_ms = (time.time() - t0) * 1000.0
-        raw = self._postprocess(results, scale, padded_size, bgr_frame.shape)
-        self.last_raw_detections = raw
-        return raw
+        regs = sorted([o for o in outputs if o.shape[-1] == 64],
+                      key=lambda x: -x.shape[0])
+        clss = sorted([o for o in outputs if o.shape[-1] == num_classes],
+                      key=lambda x: -x.shape[0])
+
+        all_boxes = []
+        all_scores = []
+        strides = [8, 16, 32]
+
+        for reg, cls, stride in zip(regs, clss, strides):
+            H, W = reg.shape[0], reg.shape[1]
+            reg = reg.reshape(H * W, 4, 16)
+            reg_exp = np.exp(reg - reg.max(axis=-1, keepdims=True))
+            reg_softmax = reg_exp / reg_exp.sum(axis=-1, keepdims=True)
+            bins = np.arange(16, dtype=np.float32)
+            distances = (reg_softmax * bins).sum(axis=-1)
+
+            yv, xv = np.meshgrid(np.arange(H), np.arange(W), indexing='ij')
+            grid = np.stack([xv, yv], axis=-1).reshape(-1, 2).astype(np.float32) + 0.5
+            grid_xy = grid * stride
+
+            x0 = grid_xy[:, 0] - distances[:, 0] * stride
+            y0 = grid_xy[:, 1] - distances[:, 1] * stride
+            x1 = grid_xy[:, 0] + distances[:, 2] * stride
+            y1 = grid_xy[:, 1] + distances[:, 3] * stride
+            boxes = np.stack([x0, y0, x1, y1], axis=-1)
+
+            scores = 1.0 / (1.0 + np.exp(-cls.reshape(H * W, num_classes)))
+
+            all_boxes.append(boxes)
+            all_scores.append(scores)
+
+        boxes = np.concatenate(all_boxes, axis=0)
+        scores = np.concatenate(all_scores, axis=0)
+        return boxes, scores
+
+    def _nms(self, boxes, scores, iou_threshold):
+        if len(boxes) == 0:
+            return []
+        x1, y1, x2, y2 = boxes[:, 0], boxes[:, 1], boxes[:, 2], boxes[:, 3]
+        areas = (x2 - x1) * (y2 - y1)
+        order = scores.argsort()[::-1]
+        keep = []
+        while len(order) > 0:
+            i = order[0]
+            keep.append(i)
+            xx1 = np.maximum(x1[i], x1[order[1:]])
+            yy1 = np.maximum(y1[i], y1[order[1:]])
+            xx2 = np.minimum(x2[i], x2[order[1:]])
+            yy2 = np.minimum(y2[i], y2[order[1:]])
+            w = np.maximum(0, xx2 - xx1)
+            h = np.maximum(0, yy2 - yy1)
+            inter = w * h
+            ovr = inter / (areas[i] + areas[order[1:]] - inter + 1e-6)
+            order = order[1:][ovr <= iou_threshold]
+        return keep
 
     def detect_ball(self, bgr_frame):
-        """
-        Public API matching vision.detect_red_object().
+        if self._hailo is None:
+            self.open()
+        rgb, scale, padded_size = self._preprocess(bgr_frame)
+        t0 = time.time()
+        outputs = self._hailo.run(rgb)
+        self.last_inference_ms = (time.time() - t0) * 1000.0
 
-        Runs YOLO, filters to ball-like classes, returns the highest-confidence
-        match as (cx, cy, radius, area_proxy) — same shape as the HSV detector
-        so the rest of the pipeline doesn't need to know which was used.
-        """
-        all_dets = self.detect_all(bgr_frame)
-        candidates = [d for d in all_dets if d["class_id"] in self.accepted_classes]
-        if not candidates:
+        # Decode YOLO outputs
+        boxes, scores = self._decode_yolov8(outputs, num_classes=1)
+        scores_flat = scores[:, 0]  # only one class
+        mask = scores_flat >= self.score_threshold
+        boxes = boxes[mask]
+        scores_flat = scores_flat[mask]
+
+        if len(boxes) == 0:
             self.last_best = None
             return None
-        best = max(candidates, key=lambda d: d["score"])
-        self.last_best = best
-        x0, y0, x1, y1 = best["bbox"]
+
+        # NMS
+        keep = self._nms(boxes, scores_flat, self.iou_threshold)
+        if not keep:
+            self.last_best = None
+            return None
+
+        # Best detection (highest score)
+        best_idx = keep[0]
+        x0, y0, x1, y1 = boxes[best_idx]
+        score = float(scores_flat[best_idx])
+
+        # Undo letterbox: scale back to original frame
+        x0, y0, x1, y1 = x0 / scale, y0 / scale, x1 / scale, y1 / scale
+        orig_h, orig_w = bgr_frame.shape[:2]
+        x0 = max(0, min(orig_w - 1, x0))
+        x1 = max(0, min(orig_w - 1, x1))
+        y0 = max(0, min(orig_h - 1, y0))
+        y1 = max(0, min(orig_h - 1, y1))
+
         cx = int((x0 + x1) / 2)
         cy = int((y0 + y1) / 2)
-        # approximate ball radius as half the shortest bbox side
         radius = int(max(4, min(x1 - x0, y1 - y0) / 2))
         area = float((x1 - x0) * (y1 - y0))
+        self.last_best = {"bbox": (x0, y0, x1, y1), "score": score}
         return (cx, cy, radius, area)
 
 
-# Convenience module-level wrapper so callers can do
-#   from vision_hailo import detect_ball_hailo
 def detect_ball_hailo(bgr_frame, hailo_ctx):
     return hailo_ctx.detect_ball(bgr_frame)

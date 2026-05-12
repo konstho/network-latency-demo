@@ -59,6 +59,9 @@ class ESP32Comm:
             print(f"[ESP32] send error: {e}")
             self.connected = False
 
+    def send_settings(self, latency_ms, jitter_ms):
+        if self.connected:
+            self.connection.write(f"LAT,{latency_ms},{jitter_ms}\n".encode())
     def disconnect(self):
         if self.connection:
             try:

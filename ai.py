@@ -28,6 +28,7 @@ from esp32 import ESP32Comm
 # on dev machines without Hailo installed.
 try:
     import vision_hailo
+
     HAILO_OK = True
 except Exception as _e:
     vision_hailo = None
@@ -139,6 +140,7 @@ class AIController:
 
     def stop(self):
         self.running = False
+        self.esp32.send(50, 50)
         print("[AI] OFF")
 
     def _clamp_tilt(self, ux, uy):
@@ -189,16 +191,24 @@ class AIController:
             ux, uy = self.pid.update(ball_pos, self.tracker.vel, target)
             tilt_x, tilt_y = self._clamp_tilt(ux, uy)
             self.last_tilt = (tilt_x, tilt_y)
-            self._apply_latency()
             self.esp32.send(int(tilt_x), int(tilt_y))
             tilt_cmd = (tilt_x, tilt_y)
+
+            # check if ball reached end
+            if target == self.path[-1]:
+                dist = ((ball_pos[0] - target[0]) ** 2 + (ball_pos[1] - target[1]) ** 2) ** 0.5
+                if dist < 20:
+                    self.stop()
+        else:
+            if self.running:
+                self.esp32.send(50, 50)
 
         status = [
             f"AI: {'ON' if self.running else 'OFF'}   "
             f"DET: {self.detector.upper()}   "
             f"FPS: {self.last_fps:4.1f}",
-            f"Ball: {'YES @ ('+str(det[0])+','+str(det[1])+')' if det else 'not detected'}",
-            f"Path: {str(len(self.path))+' pts' if self.path else 'not planned'}",
+            f"Ball: {'YES @ (' + str(det[0]) + ',' + str(det[1]) + ')' if det else 'not detected'}",
+            f"Path: {str(len(self.path)) + ' pts' if self.path else 'not planned'}",
         ]
         if self.detector == "hailo" and self.last_inference_ms > 0:
             status.append(f"Hailo inference: {self.last_inference_ms:.1f} ms")

@@ -17,16 +17,24 @@ from collections import deque
 # Red object detection
 # ---------------------------------------------------------------------------
 
-# Red wraps around hue 0/180 in HSV, so we use two ranges and OR them.
-# Tune these if your lighting is warm/cool. Higher S and V = stricter match
-# (rejects brownish table, pinkish skin, etc.).
-RED_HSV_RANGES = [
-    (np.array([0,   130, 70]),  np.array([10,  255, 255])),
-    (np.array([170, 130, 70]),  np.array([180, 255, 255])),
+# Orange ball (matte nail polish, reddish-orange / coral).
+# Hue in OpenCV is 0-180. Reddish-orange sits near 0, so we use TWO
+# ranges to catch both the "low" side (0-15) and the wrap-around (170-180)
+# in case any pixels of the ball read as deep red.
+# If detection is flaky:
+#   - too few pixels detected → lower S_min (try 80 or 60)
+#   - false positives on board edges → raise S_min or narrow hue
+#   - ball center has black hole → matte topcoat is missing or insufficient
+ORANGE_HSV_RANGES = [
+    (np.array([  0, 120, 100]), np.array([ 15, 255, 255])),
+    (np.array([170, 120, 100]), np.array([180, 255, 255])),
 ]
 
-MIN_RED_AREA_PX = 150   # reject small noise blobs
+# Kept under old names so existing imports/calls keep working.
+RED_HSV_RANGES   = ORANGE_HSV_RANGES
+GREEN_HSV_RANGES = ORANGE_HSV_RANGES
 
+MIN_RED_AREA_PX = 80    # ~30px ball ≈ π·15² ≈ 700px area, but partial mask is fine
 
 def red_mask(bgr):
     hsv = cv2.cvtColor(bgr, cv2.COLOR_BGR2HSV)

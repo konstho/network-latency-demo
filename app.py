@@ -13,18 +13,20 @@ Key fixes from the old version:
       POST /set_gains         tune kp/kd/tilt_gain/lookahead at runtime
       POST /clear_plan        forget planned path
   * backward-compatible with your existing /update, /settings, /ai, /status
-  * new page at /ai_test for AI-specific testing (your / page is untouched)
 """
 
-import random
 import threading
 import time
+import json
+import os
+
 
 import cv2
 from flask import Flask, render_template, request, jsonify, Response
 
 from picamera2 import Picamera2
 from ai import AIController
+
 
 
 # ---------------------------------------------------------------------------
@@ -36,9 +38,26 @@ app = Flask(__name__)
 # Set esp32_port="/dev/ttyUSB0" (or wherever) once you plug the ESP32 in.
 ai_controller = AIController(esp32_port=None)
 
+PATH_FILE = "path.json"
+
+def _try_load_path():
+    """Auto-load saved path on startup."""
+    if not os.path.exists(PATH_FILE):
+        return
+    try:
+        with open(PATH_FILE) as f:
+            points = json.load(f)
+        if isinstance(points, list) and len(points) >= 2:
+            ai_controller.path = [tuple(p) for p in points]
+            print(f"[path] loaded {len(points)} points from {PATH_FILE}")
+    except Exception as e:
+        print(f"[path] failed to load on startup: {e}")
+
+_try_load_path()
+
 state = {"latency": 0, "jitter": 0, "x": 50, "y": 50, "ai_mode": False}
 
-FRAME_W, FRAME_H = 640, 480
+FRAME_W, FRAME_H = 1280, 720
 
 picam = Picamera2()
 picam.configure(picam.create_video_configuration(
@@ -51,6 +70,7 @@ time.sleep(0.5)  # let auto-exposure settle
 frame_lock = threading.Lock()
 raw_frame = None        # latest frame from camera (BGR)
 display_frame = None    # latest annotated frame for the stream
+
 
 
 def _capture_loop():
@@ -109,9 +129,6 @@ def index():
     return render_template("index.html")
 
 
-@app.route("/ai_test")
-def ai_test():
-    return render_template("ai_test.html")
 
 
 @app.route("/video_feed")
@@ -126,10 +143,6 @@ def update():
     if state["ai_mode"]:
         return jsonify({"status": "ai_mode_active"})
     data = request.get_json() or {}
-    jit = random.randint(-state["jitter"], state["jitter"]) if state["jitter"] > 0 else 0
-    delay = max(0, state["latency"] + jit)
-    if delay > 0:
-        time.sleep(delay / 1000.0)
     state["x"] = data.get("x", 50)
     state["y"] = data.get("y", 50)
     ai_controller.esp32.send(int(state["x"]), int(state["y"]))
@@ -140,8 +153,8 @@ def update():
 def settings():
     data = request.get_json() or {}
     state["latency"] = int(data.get("latency", 0))
-    state["jitter"]  = int(data.get("jitter", 0))
-    ai_controller.set_latency(state["latency"], state["jitter"])
+    state["jitter"] = int(data.get("jitter", 0))
+    ai_controller.esp32.send_settings(state["latency"], state["jitter"])
     return jsonify({"status": "ok"})
 
 
@@ -188,6 +201,55 @@ def plan_path_route():
 def clear_plan():
     ai_controller.clear_plan()
     return jsonify({"status": "ok"})
+
+@app.route("/path/save", methods=["POST"])
+def path_save():
+    data = request.get_json() or {}
+    points = data.get("points", [])
+    if not isinstance(points, list) or len(points) < 2:
+        return jsonify({"status": "error",
+                        "message": "need at least 2 points"}), 400
+    cleaned = []
+    for p in points:
+        if not isinstance(p, list) or len(p) != 2:
+            return jsonify({"status": "error",
+                            "message": "bad point format"}), 400
+        cleaned.append([int(p[0]), int(p[1])])
+    try:
+        with open(PATH_FILE, "w") as f:
+            json.dump(cleaned, f, indent=2)
+        ai_controller.path = [tuple(p) for p in cleaned]
+        return jsonify({"status": "ok", "count": len(cleaned)})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route("/path/load", methods=["GET"])
+def path_load():
+    if not os.path.exists(PATH_FILE):
+        return jsonify({"status": "error",
+                        "message": "no saved path"}), 404
+    try:
+        with open(PATH_FILE) as f:
+            points = json.load(f)
+        ai_controller.path = [tuple(p) for p in points]
+        return jsonify({"status": "ok",
+                        "points": points,
+                        "count": len(points)})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route("/path/clear_saved", methods=["POST"])
+def path_clear_saved():
+    """Delete saved file AND clear in-memory path."""
+    try:
+        if os.path.exists(PATH_FILE):
+            os.remove(PATH_FILE)
+        ai_controller.clear_plan()
+        return jsonify({"status": "ok"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 
 @app.route("/set_gains", methods=["POST"])
