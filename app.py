@@ -36,7 +36,7 @@ from ai import AIController
 app = Flask(__name__)
 
 # Set esp32_port="/dev/ttyUSB0" (or wherever) once you plug the ESP32 in.
-ai_controller = AIController(esp32_port=None)
+ai_controller = AIController(esp32_port=None, detector="hailo")
 
 PATH_FILE = "path.json"
 

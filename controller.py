@@ -52,16 +52,7 @@ class BallTracker:
 
 
 class PDController:
-    """
-    Classic PD in pixel units. Output is a 2D vector (dx, dy) with the same
-    units as position error — a separate mapping step converts it to the
-    0..100 tilt range the web UI / ESP32 expects.
 
-    kp: stiffness. Too high → oscillation.
-    kd: damping. Velocity feedback. Helps kill oscillations.
-
-    Start with kp=0.5, kd=0.08 and tune once you have the real ball.
-    """
 
     def __init__(self, kp=0.5, kd=0.08):
         self.kp = kp

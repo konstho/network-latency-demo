@@ -16,41 +16,60 @@
             background-color: #060a14;
             color: #005AFF;
             min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
             padding: 20px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 20px;
         }
 
         h1 {
             font-size: 2em;
             letter-spacing: 4px;
             text-transform: uppercase;
-            color: #005AFF;
             margin-bottom: 5px;
+            width: fit-content;
+            margin-left: auto;
+            margin-right: auto;
             background: linear-gradient(135deg, #005AFF, #00D75A);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
+            color: transparent;
         }
 
-        .subtitle {
-            font-size: 0.8em;
-            letter-spacing: 6px;
-            color: #003399;
-            margin-bottom: 40px;
+        .mode-badge {
+            font-size: 0.7em;
+            letter-spacing: 3px;
             text-transform: uppercase;
+            color: #003399;
+            margin-top: 4px;
+        }
+
+        .mode-badge span {
+            color: #005AFF;
+        }
+
+        .layout {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            max-width: 1300px;
+            margin: 0 auto;
+        }
+
+        .col {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
         }
 
         .card {
             background: #0d1117;
             border: 1px solid #005AFF22;
             border-radius: 12px;
-            padding: 30px;
-            width: 100%;
-            max-width: 500px;
-            margin-bottom: 20px;
+            padding: 24px;
             box-shadow: 0 0 30px #005AFF11;
         }
 
@@ -59,11 +78,37 @@
             letter-spacing: 4px;
             text-transform: uppercase;
             color: #003399;
-            margin-bottom: 20px;
+            margin-bottom: 16px;
+        }
+
+        .status-box {
+            background: #0d1117;
+            border: 1px solid #005AFF22;
+            border-radius: 12px;
+            padding: 16px 24px;
+            display: flex;
+            justify-content: space-around;
+        }
+
+        .status-item {
+            text-align: center;
+        }
+
+        .status-item .val {
+            font-size: 1.8em;
+            font-weight: bold;
+            color: #005AFF;
+        }
+
+        .status-item .label {
+            font-size: 0.65em;
+            letter-spacing: 3px;
+            color: #003399;
+            text-transform: uppercase;
         }
 
         .slider-row {
-            margin-bottom: 20px;
+            margin-bottom: 16px;
         }
 
         .slider-label {
@@ -98,74 +143,6 @@
             box-shadow: 0 0 10px #005AFF88;
         }
 
-        .status-box {
-            background: #0d1117;
-            border: 1px solid #005AFF22;
-            border-radius: 12px;
-            padding: 20px;
-            width: 100%;
-            max-width: 500px;
-            display: flex;
-            justify-content: space-around;
-            margin-bottom: 20px;
-        }
-
-        .status-item {
-            text-align: center;
-        }
-
-        .status-item .val {
-            font-size: 1.8em;
-            font-weight: bold;
-            color: #005AFF;
-        }
-
-        .status-item .label {
-            font-size: 0.65em;
-            letter-spacing: 3px;
-            color: #003399;
-            text-transform: uppercase;
-        }
-
-        .mode-badge {
-            font-size: 0.7em;
-            letter-spacing: 3px;
-            text-transform: uppercase;
-            color: #003399;
-            margin-bottom: 30px;
-        }
-
-        .mode-badge span {
-            color: #005AFF;
-        }
-
-        #gyro-status {
-            font-size: 0.75em;
-            color: #003399;
-            letter-spacing: 2px;
-            margin-top: 10px;
-        }
-
-        .graph-card {
-            background: #0d1117;
-            border: 1px solid #005AFF22;
-            border-radius: 12px;
-            padding: 30px;
-            width: 100%;
-            max-width: 500px;
-            margin-bottom: 20px;
-            box-shadow: 0 0 30px #005AFF11;
-        }
-
-        .graph-card h2 {
-            font-size: 0.75em;
-            letter-spacing: 4px;
-            text-transform: uppercase;
-            color: #003399;
-            margin-bottom: 20px;
-        }
-
-        /* --- Nokia-style button used across AI setup and AI mode --- */
         .nokia-btn {
             background: #005AFF22;
             border: 1px solid #005AFF;
@@ -200,18 +177,36 @@
             background: #005AFF11;
         }
 
-        /* --- Camera feed container with click-overlay canvas --- */
+        .btn-row {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 10px;
+        }
+
+        .btn-row .nokia-btn {
+            flex: 1 1 auto;
+        }
+
+        .mode-selector {
+            display: flex;
+            gap: 8px;
+        }
+
+        .mode-selector .nokia-btn {
+            flex: 1;
+        }
+
         .video-container {
             position: relative;
             width: 100%;
-            aspect-ratio: 16 / 9;
+            aspect-ratio: 16/9;
             border-radius: 8px;
             overflow: hidden;
             background: #000;
         }
 
-        .video-container img,
-        .video-container canvas {
+        .video-container img, .video-container canvas {
             position: absolute;
             top: 0;
             left: 0;
@@ -228,60 +223,40 @@
             cursor: crosshair;
         }
 
-        /* --- AI setup card layout --- */
-        .setup-status {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 15px;
-            font-size: 0.75em;
-            letter-spacing: 2px;
-            color: #003399;
-        }
-
-        .setup-status .val {
-            color: #005AFF;
-            margin-left: 6px;
-        }
-
-        .setup-buttons {
-            display: flex;
-            gap: 8px;
-            flex-wrap: wrap;
-            margin-bottom: 12px;
-        }
-
-        .setup-buttons .nokia-btn {
-            flex: 1 1 auto;
-        }
-
-        #planMsg {
+        #planMsg, #manualPathMsg {
             font-size: 0.75em;
             letter-spacing: 2px;
             color: #003399;
             text-transform: uppercase;
             min-height: 1em;
+            margin-top: 8px;
         }
 
-        #planMsg.ok {
+        #planMsg.ok, #manualPathMsg.ok {
             color: #005AFF;
         }
 
-        #planMsg.error {
+        #planMsg.error, #manualPathMsg.error {
             color: #00D75A;
         }
-        /* === Demo Mode === */
+
+        #gyro-status {
+            font-size: 0.75em;
+            color: #003399;
+            letter-spacing: 2px;
+            margin-top: 8px;
+        }
+
         body.demo-mode {
             padding: 0;
             overflow: hidden;
             background: #000;
         }
 
-        /* Hide everything except the camera card and exit button */
         body.demo-mode > *:not(.video-card):not(.demo-exit-btn) {
             display: none !important;
         }
 
-        /* Promote the camera card to fullscreen */
         body.demo-mode .video-card {
             position: fixed !important;
             inset: 0 !important;
@@ -300,20 +275,18 @@
             justify-content: center !important;
         }
 
-        body.demo-mode .video-card h2,
-        body.demo-mode #demoModeBtn {
+        body.demo-mode .video-card h2, body.demo-mode #demoModeBtn {
             display: none !important;
         }
 
         body.demo-mode .video-container {
             width: min(100vw, 133.33vh) !important;
             height: auto !important;
-            aspect-ratio: 16 / 9;
+            aspect-ratio: 16/9;
             border-radius: 0 !important;
             max-width: none;
         }
 
-        /* Exit button — hidden by default, visible in demo mode */
         .demo-exit-btn {
             display: none;
             position: fixed;
@@ -339,179 +312,199 @@
         .demo-exit-btn:hover {
             background: #005AFF33;
         }
+
+        @media (max-width: 800px) {
+            .layout {
+                grid-template-columns: 1fr;
+            }
+        }
     </style>
 </head>
 <body>
 
-<h1>Nokia</h1>
+<header>
+    <h1>Nokia</h1>
+    <div class="mode-badge">Control mode: <span id="modeLabel">Physical Knobs</span></div>
+</header>
 
-<div class="mode-badge">Control mode: <span id="modeLabel">detecting...</span></div>
-
-<div class="status-box">
-    <div class="status-item">
-        <div class="val" id="dispX">50</div>
-        <div class="label">X Tilt</div>
-    </div>
-    <div class="status-item">
-        <div class="val" id="dispY">50</div>
-        <div class="label">Y Tilt</div>
-    </div>
-    <div class="status-item">
-        <div class="val" id="dispLat">0</div>
-        <div class="label">Latency ms</div>
-    </div>
-    <div class="status-item">
-        <div class="val" id="dispJitter">0</div>
-        <div class="label">Jitter ms</div>
-    </div>
-</div>
-
-<div class="card">
-    <h2>Network Settings</h2>
-    <div class="slider-row">
-        <div class="slider-label">
-            <span>Latency</span>
-            <span class="slider-value"><span id="latVal">0</span> ms</span>
+<div class="layout">
+    <div class="col">
+        <!-- Mode selector -->
+        <div class="card">
+            <h2>Control Mode</h2>
+            <div class="mode-selector">
+                <button class="nokia-btn active" id="btnKnobs" onclick="setMode('knobs')">Physical Knobs</button>
+                <button class="nokia-btn" id="btnRemote" onclick="setMode('remote')">Remote</button>
+                <button class="nokia-btn" id="btnAI" onclick="setMode('ai')">AI</button>
+            </div>
+            <div id="gyro-status"></div>
         </div>
-        <input type="range" min="0" max="1000" value="0" id="latency">
-    </div>
-    <div class="slider-row">
-        <div class="slider-label">
-            <span>Jitter</span>
-            <span class="slider-value">±<span id="jitterVal">0</span> ms</span>
+
+        <!-- Camera feed -->
+        <div class="card video-card">
+            <h2>Live Camera Feed</h2>
+            <div class="video-container" id="videoContainer">
+                <img src="/video_feed" id="streamImg" alt="camera">
+                <canvas id="overlayCanvas" width="1280" height="720"></canvas>
+            </div>
+            <button class="nokia-btn" id="demoModeBtn" onclick="enterDemoMode()" style="margin-top:12px;width:100%;">
+                Fullscreen mode
+            </button>
         </div>
-        <input type="range" min="0" max="500" value="0" id="jitter">
-    </div>
-</div>
 
-<div class="graph-card">
-    <h2>Live Network Delay Graph</h2>
-    <canvas id="latencyChart"></canvas>
-</div>
-
-<div class="card video-card">
-    <h2>Live Camera Feed</h2>
-    <div class="video-container" id="videoContainer">
-        <img src="/video_feed" id="streamImg" alt="camera">
-        <canvas id="overlayCanvas" width="1280" height="720"></canvas>
+        <!-- Plan Path -->
+        <div class="card">
+            <h2>Plan Path</h2>
+            <div style="display:flex;justify-content:space-between;margin-bottom:12px;font-size:0.75em;letter-spacing:2px;color:#003399;">
+                <div>Points:<span style="color:#005AFF;margin-left:6px;" id="pathPointCount">0</span></div>
+                <div>Editing:<span style="color:#005AFF;margin-left:6px;" id="pathEditStatus">off</span></div>
+            </div>
+            <div class="btn-row">
+                <button class="nokia-btn" id="editPathBtn" onclick="togglePathEdit()">Edit Path</button>
+                <button class="nokia-btn secondary" onclick="undoLastPoint()">Undo Last</button>
+            </div>
+            <div class="btn-row">
+                <button class="nokia-btn" onclick="saveManualPath()">Save Path</button>
+                <button class="nokia-btn" onclick="loadManualPath()">Load Saved</button>
+                <button class="nokia-btn secondary" onclick="clearManualPath()">Clear Points</button>
+            </div>
+            <div id="manualPathMsg">Click 'Edit Path' then click points along the maze route</div>
+        </div>
     </div>
-    <button class="nokia-btn" id="demoModeBtn" onclick="enterDemoMode()" style="margin-top: 15px; width: 100%;">Fullscreen mode</button>
+
+    <div class="col">
+        <!-- Status -->
+        <div class="status-box">
+            <div class="status-item">
+                <div class="val" id="dispX">50</div>
+                <div class="label">X Tilt</div>
+            </div>
+            <div class="status-item">
+                <div class="val" id="dispY">50</div>
+                <div class="label">Y Tilt</div>
+            </div>
+            <div class="status-item">
+                <div class="val" id="dispLat">0</div>
+                <div class="label">Latency ms</div>
+            </div>
+            <div class="status-item">
+                <div class="val" id="dispJitter">0</div>
+                <div class="label">Jitter ms</div>
+            </div>
+        </div>
+
+        <!-- Network settings -->
+        <div class="card">
+            <h2>Network Settings</h2>
+            <div class="slider-row">
+                <div class="slider-label"><span>Latency</span><span class="slider-value"><span
+                        id="latVal">0</span> ms</span></div>
+                <input type="range" min="0" max="1000" value="0" id="latency">
+            </div>
+            <div class="slider-row">
+                <div class="slider-label"><span>Jitter</span><span class="slider-value">±<span id="jitterVal">0</span> ms</span>
+                </div>
+                <input type="range" min="0" max="500" value="0" id="jitter">
+            </div>
+        </div>
+
+        <!-- Graph -->
+        <div class="card">
+            <h2>Live Network Delay Graph</h2>
+            <canvas id="latencyChart"></canvas>
+        </div>
+
+        <!-- AI status (no buttons, just feedback) -->
+
+    </div>
 </div>
 
 <button class="demo-exit-btn" onclick="exitDemoMode()">Exit</button>
 
-<div class="card">
-    <h2>AI Setup</h2>
-    <div class="setup-status">
-        <div>Detector:<span class="val" id="detectorStatus">HSV</span></div>
-    </div>
-    <div class="setup-buttons" style="margin-bottom: 8px;">
-        <button class="nokia-btn active" id="detHsvBtn" onclick="setDetector('hsv')">HSV (classical)</button>
-        <button class="nokia-btn" id="detHailoBtn" onclick="setDetector('hailo')">Hailo (YOLO)</button>
-    </div>
-
-</div>
-
-
-<div class="card">
-    <h2>Plan Path</h2>
-    <div class="setup-status">
-        <div>Points:<span class="val" id="pathPointCount">0</span></div>
-        <div>Editing:<span class="val" id="pathEditStatus">off</span></div>
-    </div>
-    <div class="setup-buttons">
-        <button class="nokia-btn" id="editPathBtn" onclick="togglePathEdit()">Edit Path</button>
-        <button class="nokia-btn secondary" id="undoPathBtn" onclick="undoLastPoint()">Undo Last</button>
-    </div>
-    <div class="setup-buttons">
-        <button class="nokia-btn" id="savePathBtn" onclick="saveManualPath()">Save Path</button>
-        <button class="nokia-btn" id="loadPathBtn" onclick="loadManualPath()">Load Saved</button>
-        <button class="nokia-btn secondary" id="clearPathBtn" onclick="clearManualPath()">Clear Points</button>
-    </div>
-    <div id="manualPathMsg" style="font-size: 0.75em; letter-spacing: 2px;
-         color: #003399; text-transform: uppercase; min-height: 1em;
-         margin-top: 8px;">Click 'Edit Path' then click points along the maze route
-    </div>
-</div>
-
-<div class="card">
-    <h2>AI Mode</h2>
-    <div style="display: flex; justify-content: space-between; align-items: center;">
-        <span style="letter-spacing: 2px; font-size: 0.9em;">Let AI play the maze</span>
-        <button id="aiBtn" class="nokia-btn" onclick="toggleAI()">Enable AI</button>
-    </div>
-    <div id="aiStatus" style="
-            margin-top: 15px;
-            font-size: 0.75em;
-            letter-spacing: 2px;
-            color: #003399;
-            text-transform: uppercase;
-        ">AI is off
-    </div>
-</div>
-
-<div id="gyro-status"></div>
-
 <script>
     let isMobile = /iPhone|iPad|Android/i.test(navigator.userAgent);
-    let x = 50, y = 50;
-    let currentLatency = 0;
-    let currentJitter = 0;
+    let x = 50, y = 50, currentLatency = 0, currentJitter = 0;
+    let controlMode = "knobs";
+    let aiActive = false;
 
-    document.getElementById("modeLabel").innerText = isMobile ? "Phone Gyroscope" : "Keyboard Arrows";
+    // ── mode selector ──
+    function setMode(mode) {
+        if (aiActive && mode !== "ai") {
+            fetch("/ai", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({enable: false})
+            });
+            aiActive = false;
+        }
+        if (mode === "ai" && !aiActive) {
+            fetch("/ai", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({enable: true})
+            })
+                .then(r => r.json()).then(d => {
+                if (d.status !== "ok") setMode("knobs"); else aiActive = true;
+            });
+        }
+        controlMode = mode;
+        document.getElementById("btnKnobs").classList.toggle("active", mode === "knobs");
+        document.getElementById("btnRemote").classList.toggle("active", mode === "remote");
+        document.getElementById("btnAI").classList.toggle("active", mode === "ai");
+        document.getElementById("modeLabel").innerText =
+            mode === "knobs" ? "Physical Knobs" :
+                mode === "remote" ? (isMobile ? "Phone Gyroscope" : "Keyboard Arrows") : "AI";
+    }
 
-    // -------- chart setup --------
+    // ── chart ──
     const ctx = document.getElementById("latencyChart").getContext("2d");
-    const maxPoints = 30;
-    const labels = Array(maxPoints).fill("");
-    const latencyData = Array(maxPoints).fill(0);
-    const actualDelayData = Array(maxPoints).fill(0);
-
+    const maxPoints = 30, labels = Array(maxPoints).fill("");
+    const latencyData = Array(maxPoints).fill(0), actualDelayData = Array(maxPoints).fill(0);
     const chart = new Chart(ctx, {
         type: "line",
         data: {
-            labels: labels,
-            datasets: [
+            labels, datasets: [
                 {
                     label: "Latency (ms)",
                     data: latencyData,
                     borderColor: "#005AFF",
                     backgroundColor: "#005AFF11",
-                    borderWidth: 2, pointRadius: 0, tension: 0.4, fill: true
+                    borderWidth: 2,
+                    pointRadius: 0,
+                    tension: 0.4,
+                    fill: true
                 },
                 {
                     label: "Actual Delay with Jitter (ms)",
                     data: actualDelayData,
                     borderColor: "#00D75A",
                     backgroundColor: "#00D75A11",
-                    borderWidth: 2, pointRadius: 0, tension: 0.4, fill: true
+                    borderWidth: 2,
+                    pointRadius: 0,
+                    tension: 0.4,
+                    fill: true
                 }
             ]
         },
         options: {
             animation: false,
-            scales: {
-                x: {display: false},
-                y: {min: 0, ticks: {color: "#003399"}, grid: {color: "#005AFF11"}}
-            },
+            scales: {x: {display: false}, y: {min: 0, ticks: {color: "#003399"}, grid: {color: "#005AFF11"}}},
             plugins: {legend: {labels: {color: "#005AFF", font: {size: 10}}}}
         }
     });
 
     function updateGraph() {
-        const jitter = currentJitter;
-        const randomJitter = Math.floor(Math.random() * (jitter * 2 + 1)) - jitter;
-        const actualDelay = Math.max(0, currentLatency + randomJitter);
+        const rj = Math.floor(Math.random() * (currentJitter * 2 + 1)) - currentJitter;
         latencyData.push(currentLatency);
         latencyData.shift();
-        actualDelayData.push(actualDelay);
+        actualDelayData.push(Math.max(0, currentLatency + rj));
         actualDelayData.shift();
         chart.update();
     }
 
     setInterval(updateGraph, 500);
 
-    // -------- manual tilt sending --------
+    // ── tilt + settings ──
     function sendTilt() {
         document.getElementById("dispX").innerText = Math.round(x);
         document.getElementById("dispY").innerText = Math.round(y);
@@ -523,32 +516,30 @@
     }
 
     function sendSettings() {
-        const latency = document.getElementById("latency").value;
-        const jitter = document.getElementById("jitter").value;
-        currentLatency = parseInt(latency);
-        currentJitter = parseInt(jitter);
-        document.getElementById("latVal").innerText = latency;
-        document.getElementById("jitterVal").innerText = jitter;
-        document.getElementById("dispLat").innerText = latency;
-        document.getElementById("dispJitter").innerText = jitter;
+        const lat = document.getElementById("latency").value, jit = document.getElementById("jitter").value;
+        currentLatency = parseInt(lat);
+        currentJitter = parseInt(jit);
+        document.getElementById("latVal").innerText = lat;
+        document.getElementById("jitterVal").innerText = jit;
+        document.getElementById("dispLat").innerText = lat;
+        document.getElementById("dispJitter").innerText = jit;
         fetch("/settings", {
             method: "POST",
             headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({latency: parseInt(latency), jitter: parseInt(jitter)})
+            body: JSON.stringify({latency: parseInt(lat), jitter: parseInt(jit)})
         });
     }
 
     document.getElementById("latency").addEventListener("input", sendSettings);
     document.getElementById("jitter").addEventListener("input", sendSettings);
 
-    // -------- gyroscope (phone) --------
+    // ── gyroscope ──
     if (isMobile) {
-        if (typeof DeviceOrientationEvent !== "undefined" &&
-            typeof DeviceOrientationEvent.requestPermission === "function") {
+        if (typeof DeviceOrientationEvent !== "undefined" && typeof DeviceOrientationEvent.requestPermission === "function") {
             document.getElementById("gyro-status").innerText = "Tap screen to enable gyroscope";
             document.body.addEventListener("click", () => {
-                DeviceOrientationEvent.requestPermission().then(state => {
-                    if (state === "granted") {
+                DeviceOrientationEvent.requestPermission().then(s => {
+                    if (s === "granted") {
                         document.getElementById("gyro-status").innerText = "Gyroscope active";
                         startGyro();
                     }
@@ -561,19 +552,20 @@
 
     function startGyro() {
         window.addEventListener("deviceorientation", (e) => {
+            if (controlMode !== "remote") return;
             x = Math.min(100, Math.max(0, (e.gamma + 45) * (100 / 90)));
             y = Math.min(100, Math.max(0, (e.beta + 45) * (100 / 90)));
             sendTilt();
         });
     }
 
-    // -------- arrow keys (laptop) --------
+    // ── arrow keys ──
     if (!isMobile) {
         const keys = {};
         document.addEventListener("keydown", e => keys[e.key] = true);
         document.addEventListener("keyup", e => keys[e.key] = false);
-
         setInterval(() => {
+            if (controlMode !== "remote") return;
             let moved = false;
             if (keys["ArrowLeft"]) {
                 x = Math.max(0, x - 2);
@@ -595,32 +587,17 @@
         }, 50);
     }
 
-    // =====================================================================
-    // AI SETUP — click to mark start/end, plan path, enable AI
-    // =====================================================================
 
+    // ── overlay / path ──
     const videoContainer = document.getElementById("videoContainer");
     const overlayCanvas = document.getElementById("overlayCanvas");
     const octx = overlayCanvas.getContext("2d");
-
-    let clickMode = null;           // "start" | "end" | null
-    let startXY = null;
-    let endXY = null;
-    let pathPlanned = false;
-
-    function pickMode(which) {
-        clickMode = (clickMode === which) ? null : which;
-        videoContainer.classList.toggle("picking", clickMode !== null);
-        document.getElementById("pickStartBtn").classList.toggle("active", clickMode === "start");
-        document.getElementById("pickEndBtn").classList.toggle("active", clickMode === "end");
-    }
+    let clickMode = null, startXY = null, endXY = null, pathPoints = [], pathEditing = false;
 
     overlayCanvas.addEventListener("click", async (e) => {
         const rect = overlayCanvas.getBoundingClientRect();
         const cx = Math.round((e.clientX - rect.left) * (overlayCanvas.width / rect.width));
         const cy = Math.round((e.clientY - rect.top) * (overlayCanvas.height / rect.height));
-
-        // path editing mode: append point, stay in mode
         if (pathEditing) {
             pathPoints.push([cx, cy]);
             redrawOverlay();
@@ -628,45 +605,29 @@
             setManualPathMsg(`Point ${pathPoints.length} added`);
             return;
         }
-
-        // start/end picking mode (existing)
         if (!clickMode) return;
-        if (clickMode === "start") {
-            startXY = [cx, cy];
-        } else {
-            endXY = [cx, cy];
-        }
-
-        pickMode(null);
+        if (clickMode === "start") startXY = [cx, cy]; else endXY = [cx, cy];
+        clickMode = null;
+        videoContainer.classList.remove("picking");
         redrawOverlay();
-        updateSetupStatus();
-
-        if (startXY && endXY) {
-            await fetch("/set_start_end", {
-                method: "POST",
-                headers: {"Content-Type": "application/json"},
-                body: JSON.stringify({start: startXY, end: endXY})
-            });
-        }
+        if (startXY && endXY) await fetch("/set_start_end", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({start: startXY, end: endXY})
+        });
     });
 
     function redrawOverlay() {
         octx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
-
-        // --- draw manual path: line through all points + numbered markers ---
         if (pathPoints.length > 0) {
-            // connecting line
             octx.strokeStyle = "#ffaa00";
             octx.lineWidth = 2;
             octx.shadowBlur = 8;
             octx.shadowColor = "#ffaa00";
             octx.beginPath();
             octx.moveTo(pathPoints[0][0], pathPoints[0][1]);
-            for (let i = 1; i < pathPoints.length; i++) {
-                octx.lineTo(pathPoints[i][0], pathPoints[i][1]);
-            }
+            for (let i = 1; i < pathPoints.length; i++) octx.lineTo(pathPoints[i][0], pathPoints[i][1]);
             octx.stroke();
-            // numbered dots
             octx.shadowBlur = 0;
             octx.fillStyle = "#ffaa00";
             octx.font = "bold 11px Arial";
@@ -682,8 +643,6 @@
                 octx.fillStyle = "#ffaa00";
             }
         }
-
-        // --- start marker (existing) ---
         if (startXY) {
             octx.strokeStyle = "#005AFF";
             octx.lineWidth = 4;
@@ -701,7 +660,6 @@
             octx.lineTo(startXY[0], startXY[1] + 8);
             octx.stroke();
         }
-        // --- end marker (existing) ---
         if (endXY) {
             octx.strokeStyle = "#00D75A";
             octx.lineWidth = 4;
@@ -722,127 +680,16 @@
         octx.shadowBlur = 0;
     }
 
-    function updateSetupStatus() {
-        document.getElementById("startStatus").innerText =
-            startXY ? `${startXY[0]}, ${startXY[1]}` : "—";
-        document.getElementById("endStatus").innerText =
-            endXY ? `${endXY[0]}, ${endXY[1]}` : "—";
-        document.getElementById("pathStatus").innerText =
-            pathPlanned ? "planned" : "—";
-    }
-
     function setPlanMsg(text, cls) {
         const el = document.getElementById("planMsg");
         el.innerText = text;
         el.className = cls || "";
     }
 
-    async function planPath() {
-        if (!startXY || !endXY) {
-            setPlanMsg("Set start and end first", "error");
-            return;
-        }
-        setPlanMsg("Planning...", "");
-        try {
-            const r = await fetch("/plan_path", {method: "POST"});
-            const j = await r.json();
-            if (j.status === "ok") {
-                pathPlanned = true;
-                updateSetupStatus();
-                setPlanMsg(j.message || "Path planned", "ok");
-            } else {
-                pathPlanned = false;
-                updateSetupStatus();
-                setPlanMsg(j.message || "Planning failed", "error");
-            }
-        } catch (e) {
-            setPlanMsg("Request failed", "error");
-        }
-    }
-
-    async function clearPlan() {
-        startXY = null;
-        endXY = null;
-        pathPlanned = false;
-        clickMode = null;
-        videoContainer.classList.remove("picking");
-        document.getElementById("pickStartBtn").classList.remove("active");
-        document.getElementById("pickEndBtn").classList.remove("active");
-        redrawOverlay();
-        updateSetupStatus();
-        setPlanMsg("Reset — mark start and end", "");
-        await fetch("/clear_plan", {method: "POST"});
-        // also turn AI off if it was on
-        if (aiActive) toggleAI();
-    }
-
-    async function setDetector(name) {
-        try {
-            const r = await fetch("/set_detector", {
-                method: "POST",
-                headers: {"Content-Type": "application/json"},
-                body: JSON.stringify({detector: name})
-            });
-            const j = await r.json();
-            const actual = j.detector || name;
-            document.getElementById("detectorStatus").innerText = actual.toUpperCase();
-            document.getElementById("detHsvBtn").classList.toggle("active", actual === "hsv");
-            document.getElementById("detHailoBtn").classList.toggle("active", actual === "hailo");
-            if (j.status === "fallback") {
-                setPlanMsg("Hailo not available, using HSV", "error");
-            } else {
-                setPlanMsg(`Detector: ${actual.toUpperCase()}`, "ok");
-            }
-        } catch (e) {
-            setPlanMsg("Could not change detector", "error");
-        }
-    }
-
-    // =====================================================================
-    // AI toggle (existing, with friendlier error handling)
-    // =====================================================================
-
-    let aiActive = false;
-
-    function toggleAI() {
-        const newState = !aiActive;
-        const btn = document.getElementById("aiBtn");
-        const status = document.getElementById("aiStatus");
-
-        fetch("/ai", {
-            method: "POST",
-            headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({enable: newState})
-        })
-            .then(res => res.json().then(data => ({ok: res.ok, data})))
-            .then(({ok, data}) => {
-                if (ok && data.status === "ok") {
-                    aiActive = newState;
-                    btn.innerText = aiActive ? "Disable AI" : "Enable AI";
-                    btn.classList.toggle("active", aiActive);
-                    status.innerText = aiActive ? "AI is playing..." : "AI is off";
-                    status.style.color = aiActive ? "#005AFF" : "#003399";
-                } else {
-                    setPlanMsg(data.message || "AI could not start", "error");
-                }
-            })
-            .catch(() => setPlanMsg("AI request failed", "error"));
-    }
-
-
-    // =====================================================================
-    // MANUAL PATH (approach 3) — click N points, save to JSON
-    // =====================================================================
-
-    let pathPoints = [];
-    let pathEditing = false;
-
     function setManualPathMsg(text, cls) {
         const el = document.getElementById("manualPathMsg");
         el.innerText = text;
-        el.style.color = (cls === "ok") ? "#005AFF"
-            : (cls === "error") ? "#00D75A"
-                : "#003399";
+        el.style.color = cls === "ok" ? "#005AFF" : cls === "error" ? "#00D75A" : "#003399";
     }
 
     function updatePathStatus() {
@@ -852,22 +699,15 @@
 
     function togglePathEdit() {
         pathEditing = !pathEditing;
-        // make sure we're not in start/end pick mode at the same time
-        if (pathEditing) {
-            clickMode = null;
-            document.getElementById("pickStartBtn").classList.remove("active");
-            document.getElementById("pickEndBtn").classList.remove("active");
-        }
-        videoContainer.classList.toggle("picking", pathEditing || clickMode !== null);
+        if (pathEditing) clickMode = null;
+        videoContainer.classList.toggle("picking", pathEditing);
         document.getElementById("editPathBtn").classList.toggle("active", pathEditing);
         updatePathStatus();
-        setManualPathMsg(pathEditing
-            ? `Click points along the route (${pathPoints.length} so far)`
-            : "Editing off");
+        setManualPathMsg(pathEditing ? `Click points along the route (${pathPoints.length} so far)` : "Editing off");
     }
 
     function undoLastPoint() {
-        if (pathPoints.length === 0) return;
+        if (!pathPoints.length) return;
         pathPoints.pop();
         redrawOverlay();
         updatePathStatus();
@@ -886,33 +726,22 @@
                 body: JSON.stringify({points: pathPoints})
             });
             const j = await r.json();
-            if (j.status === "ok") {
-                setManualPathMsg(`Saved ${j.count} points to path.json`, "ok");
-                pathPlanned = true;
-                updateSetupStatus();
-            } else {
-                setManualPathMsg(j.message || "Save failed", "error");
-            }
-        } catch (e) {
+            j.status === "ok" ? setManualPathMsg(`Saved ${j.count} points`, "ok") : setManualPathMsg(j.message || "Save failed", "error");
+        } catch {
             setManualPathMsg("Save request failed", "error");
         }
     }
 
     async function loadManualPath() {
         try {
-            const r = await fetch("/path/load");
-            const j = await r.json();
+            const r = await fetch("/path/load"), j = await r.json();
             if (j.status === "ok" && j.points) {
                 pathPoints = j.points.map(p => [p[0], p[1]]);
-                pathPlanned = true;
                 redrawOverlay();
                 updatePathStatus();
-                updateSetupStatus();
                 setManualPathMsg(`Loaded ${j.count} points`, "ok");
-            } else {
-                setManualPathMsg(j.message || "No saved path found", "error");
-            }
-        } catch (e) {
+            } else setManualPathMsg(j.message || "No saved path found", "error");
+        } catch {
             setManualPathMsg("Load request failed", "error");
         }
     }
@@ -921,29 +750,23 @@
         pathPoints = [];
         pathEditing = false;
         document.getElementById("editPathBtn").classList.remove("active");
-        if (clickMode === null) videoContainer.classList.remove("picking");
+        videoContainer.classList.remove("picking");
         redrawOverlay();
         updatePathStatus();
-        setManualPathMsg("Cleared (saved file untouched — Save to overwrite)");
+        setManualPathMsg("Cleared");
     }
 
-    // auto-load on page start
     window.addEventListener("load", () => {
         fetch("/path/load").then(r => r.json()).then(j => {
             if (j.status === "ok" && j.points) {
                 pathPoints = j.points.map(p => [p[0], p[1]]);
-                pathPlanned = true;
                 redrawOverlay();
                 updatePathStatus();
-                updateSetupStatus();
-                setManualPathMsg(`Auto-loaded ${j.count} points from path.json`, "ok");
+                setManualPathMsg(`Auto-loaded ${j.count} points`, "ok");
             }
         }).catch(() => {
         });
     });
-    // =====================================================================
-    // DEMO MODE — fullscreen view of the maze for the audience
-    // =====================================================================
 
     function enterDemoMode() {
         document.body.classList.add("demo-mode");
@@ -953,11 +776,8 @@
         document.body.classList.remove("demo-mode");
     }
 
-    // Esc to exit demo mode
-    document.addEventListener("keydown", (e) => {
-        if (e.key === "Escape" && document.body.classList.contains("demo-mode")) {
-            exitDemoMode();
-        }
+    document.addEventListener("keydown", e => {
+        if (e.key === "Escape" && document.body.classList.contains("demo-mode")) exitDemoMode();
     });
 </script>
 </body>

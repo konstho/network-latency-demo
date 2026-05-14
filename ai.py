@@ -37,7 +37,7 @@ except Exception as _e:
 
 
 class AIController:
-    def __init__(self, esp32_port=None, detector="hsv"):
+    def __init__(self, esp32_port=None, detector="hailo"):
         self.esp32 = ESP32Comm(port=esp32_port)
         self.esp32.connect()
 
